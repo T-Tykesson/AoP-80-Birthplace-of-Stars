@@ -1,5 +1,6 @@
 # PROMISE Data (very large)
 source_data/
+src_data/
 
 
 # == Begin preset .gitignore == #
