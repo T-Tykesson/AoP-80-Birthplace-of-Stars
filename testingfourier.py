@@ -30,6 +30,6 @@ fitspromise = hdul[0].data[0:10000, 0:10000]
 
 fourier2d = scifft.fft2(fitspromise, s=None, axes=(-2, -1), norm=None)
 plt.plot(fitspromise)
-plt.imshow(fitspromise)
+plt.show()
 
 #Skiten är inte i närheten av rimligt/fungerande
