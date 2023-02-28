@@ -212,30 +212,48 @@ def plot_spectrum(im_fft):
     plt.imshow(np.abs(im_fft), norm=LogNorm(vmin=5))
     plt.colorbar()
 
-plot_general(cutouts[6], dpi=300, colorbar=True, cmap="hot", title="Cutouts 6 original", scale=20)
+plot_general(cutouts[6], dpi=300, colorbar=True, cmap="hot", title="original", scale=20)
     
-fourier2d = scifft.rfft2(cutouts[1], s=None, axes=(-2, -1), norm=None)
+fourier2d = scifft.fft2(cutouts[6])
 
 #plot_general(fourier2d, dpi=300, colorbar=True, cmap="hot", title="Test plot Fourier 1", scale=20)
 
-plot_spectrum(fourier2d)
-plt.title("Fourier Transform")
+#plot_spectrum(fourier2d)
+#plt.title("Fourier Transform")
 
 fraction_keep = 0.01
-fouriercopy = fourier2d
+fouriercopy = fourier2d.copy()
+fouriercopy2 = fourier2d.copy()
 row, column = fourier2d.shape
 fouriercopy[int(row*fraction_keep):int(row*(1-fraction_keep))] = 0
 fouriercopy[:, int(column*fraction_keep):int(column*(1-fraction_keep))] = 0
 
 plt.figure()
 plot_spectrum(fouriercopy)
-plt.title("Filtered Fourier Transform")
+plt.title("Low Filtered Fourier Transform")
 
-fourier2d = scifft.irfft2(fouriercopy, s=None, axes=(-2, -1), norm=None).real
-#plot_general(fourier2d, dpi=300, colorbar=True, cmap="hot", title="Test plot fourier 2", scale=20)
+fourierfiltered = scifft.ifft2(fouriercopy).real
 
-plot_general(fourier2d, dpi=300, colorbar=True, cmap="hot", title="recunstructed image", scale=20)
+plot_general(fourierfiltered, dpi=300, colorbar=True, cmap="hot", title="recunstructed image", scale=20)
 
 
+#highpass verkar värdelöst
+highpass_threshold = 3500
+
+fouriercopy2[0:int(row/2-highpass_threshold)] = 0
+fouriercopy2[int(row/2+highpass_threshold):row] = 0
+
+fouriercopy2[:, 0:int(column/2-highpass_threshold)] = 0
+fouriercopy2[:, int(column/2+highpass_threshold):column] = 0
+
+        
+
+plt.figure()
+plot_spectrum(fouriercopy2)
+plt.title("Highpass")
+
+fourierfiltered = scifft.ifft2(fouriercopy2).real
+
+plot_general(fourierfiltered, dpi=300, colorbar=True, cmap="hot", title="recunstructed image", scale=20)
 
         
