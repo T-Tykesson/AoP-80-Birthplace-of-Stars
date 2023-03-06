@@ -1,43 +1,37 @@
 
+from matplotlib.axes import Axes
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
-def plot_general(function, dpi=60, fig_size=(30,13), title = None, vmin=None, vmax=None, cmap="hot", scale=1, grid=False, colorbar=False):
-    mean = np.mean(function)
-    std_dev = np.std(function)
-    lower = mean - scale*std_dev
-    upper = mean + scale*std_dev
-    if vmin == None:
-        vmin = function.min()
-    elif vmin == 1:
-        vmin = mean - scale*std_dev
-        
-    if vmax == None:
-        vmax = function.max()
-    elif vmax == 1:
-        vmax = mean + scale*std_dev
+def plot_general(functions, dpi=60, fig_size=(30,13), title = None, cmap="hot", scale=1, grid=False, colorbar=True, fig_index=None):
     
-    plt.figure(figsize=fig_size, dpi=dpi)
-    ax = plt.gca()
-    im = ax.imshow(function, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
+    # plt.figure(fig_index, figsize=fig_size, dpi=dpi)
+    
+    # If two functions/imgs are passed, draw them both in the same plot
+    if not isinstance(functions, tuple):
+        functions = (functions,)
+    
+    fig, axis = plt.subplots(1, len(functions), figsize=fig_size, dpi=dpi)
+    if isinstance(axis, Axes):
+        axis = (axis,)
     
     if title != None: 
-        plt.title(f"{title}")
+        fig.suptitle(f"{title}")
     
-    if grid:
-        plt.grid(alpha=0.05)
-    else:
-        plt.grid(alpha=0)
+    for i, func in enumerate(functions):
+        im = axis[i].imshow(func, origin="lower", cmap=cmap)
         
-    if colorbar:
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
+        axis[i].grid(alpha=0.05) if grid else axis[i].grid(alpha=0)
+
+        if colorbar:
+            divider = make_axes_locatable(axis[i])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
         
-    plt.show()
+    plt.draw()
 
 
 def plot_figure(func, title, norm=None, dpi=None):
