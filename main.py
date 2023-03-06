@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+from plotting import *
 
 from astropy.io import fits
 from astropy.utils.data import get_pkg_data_filename
@@ -11,9 +12,8 @@ from skimage.filters import gaussian, unsharp_mask, threshold_otsu, threshold_lo
 import numpy as np
 from tqdm import tqdm
 
-plt.style.use(astropy_mpl_style)
-X_LOWER, X_UPPER = 0, 120_000
-Y_LOWER, Y_UPPER = 0, 12_000
+from typing import Tuple
+
 
 # Notes:
 """
@@ -24,132 +24,63 @@ The lab computers can load the entire image in about 3 mins
 There is only one HDU (the primary one), we could add our masks to the same FITS file
 """
 
-#%%
-"Data split"
-
-src_path = "src_data/PROMISE-Q1-8micron-filled-v0_3.fits"
-
-use_cutouts = False  # Easier on the memory if we just use one slice
-cutouts = []
-xslice = 7500 #5000 #10000
-yslice = 7000 #3500 #3500
-
-X_LOWER, X_UPPER = 115_000, 120_000
-Y_LOWER, Y_UPPER = 7_000, 9_000
 
 
-with fits.open(src_path, memmap=True) as fits_data:  # use_fsspec=True, fsspec_kwargs={"anon": True}, memmap=True) as hdul: 
-    if use_cutouts:
-        for i in tqdm(range(0, int(7000/yslice))):
-            for j in tqdm(range(0, int(120000/xslice))):
-                cutouts.append(fits_data[0].section[yslice*i:yslice*i + yslice, xslice*j:xslice*j+xslice])
-    else:
-        cutouts.append(fits_data["PRIMARY"].data[ Y_LOWER:Y_UPPER, X_LOWER:X_UPPER])
+class SeedClassifier:
+    def __init__(self, promise_path: str, limits: Tuple, single_slice=True):
 
-#%%
+        self.cutouts = []
 
-def plot_general(function, dpi=60, fig_size=(30,13), title = None, vmin=None, vmax=None, cmap="gray_r", scale=1, grid=False, colorbar=False):
-    mean = np.mean(function)
-    std_dev = np.std(function)
-    lower = mean - scale*std_dev
-    upper = mean + scale*std_dev
-    if vmin == None:
-        vmin = function.min()
-    elif vmin == 1:
-        vmin = mean - scale*std_dev
+        with fits.open(promise_path, memmap=True) as fits_data:
+            
+            xmax, ymax = fits_data["PRIMARY"].data.shape
+
+            if not single_slice:
+
+                xslice_size = limits[0]
+                yslice_size = limits[1]
+
+                for i in tqdm(range(0, int(ymax/yslice_size))):
+                    for j in tqdm(range(0, int(xmax/xslice_size))):
+                        self.cutouts.append(fits_data["PRIMARY"].data[yslice_size*i : yslice_size*i+yslice_size, xslice_size*j : xslice_size*j+xslice_size])
+            else:
+                self.cutouts.append(fits_data["PRIMARY"].data[ limits[0]:limits[1], limits[2]:limits[3] ])
+    
+    def run(self):
         
-    if vmax == None:
-        vmax = function.max()
-    elif vmax == 1:
-        vmax = mean + scale*std_dev
-    
-    plt.figure(figsize=fig_size, dpi=dpi)
-    ax = plt.gca()
-    im = ax.imshow(function, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax)
-    
-    if title != None: 
-        plt.title(f"{title}")
-    
-    if grid:
-        plt.grid(alpha=0.05)
-    else:
-        plt.grid(alpha=0)
+        for i, cutout in enumerate(tqdm(self.cutouts)):
+            print(cutout)
+            plot_general(cutout, colorbar=True, title=f"Original {i+1}", scale=40)
+
+            plot_general(self.unsharp_mask_basic(cutout), title=f"Applied unsharp masking {i+1}")
         
-    if colorbar:
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-        
-    plt.show()
+            # plot_general(unsharp_masks[i], colorbar=True, vmin=None, vmax=1, cmap="hot", title=f"Unsharp mask {i}", scale=20)
+
+            # plot_general(self.unsharp_mask_fft())
+            # plot_general(self.highpass())
+            # plot_general(self.lowpass())
+
+    def unsharp_mask_basic(self, img, kernel_size=1, weight=1, threshold=None):
+        gaus = gaussian(img, sigma=kernel_size)
+        mask = img - gaus
+        applied = img + weight * mask
+        if threshold:
+            applied[applied >= threshold] = threshold
+        return applied
 
 
-def plot_figure(func, title, norm=None, dpi=None):
-    plt.figure()
-    if dpi:
-        plt.rcParams['figure.dpi'] = dpi
-        
+if __name__ == "__main__":
+    plt.style.use(astropy_mpl_style)
     
-    plt.title(f"{title}")
-    plt.grid(alpha=0.05)
-    ax = plt.gca()
-    #pcm = ax.pcolor(func, norm=colors.LogNorm(vmin=func.min(), vmax=func.max()))
-    im = ax.imshow(func, norm=norm, cmap='gnuplot')
-    # create an axes on the right side of ax. The width of cax will be 5%
-    # of ax and the padding between cax and ax will be fixed at 0.05 inch.
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-       
-    plt.colorbar(im, cax=cax)
-    plt.show()
+    src_path = "src_data/PROMISE-Q1-8micron-filled-v0_3.fits"
 
+    X_LOWER, X_UPPER = 115_000, 120_000
+    Y_LOWER, Y_UPPER = 7_000, 9_000
 
-def plot_image(func, title, save=False, dpi=None):
-    plt.figure()
-    plt.axis('off')
-    
-    if dpi:
-        plt.rcParams['figure.dpi'] = dpi
-    ax = plt.gca()
-    im = ax.imshow(func, norm=colors.PowerNorm(gamma=0.5), cmap='gnuplot')
-    
-    
-    if save:
-        plt.savefig(f"{title}.png", dpi=300, bbox_inches=0)
-    plt.show()
+    sc = SeedClassifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
+    sc.run()
 
-def unsharp_mask(function, sigma, k=1): 
-    "k=1 unsharp mask, greater than 1, superfunction"
-    gaus = gaussian(function, sigma=sigma)
-    mask = function - gaus
-    return ((function + k * mask), mask, gaus)
-
-
-#%%
-"Plot cutouts"
-for i in range(0, len(cutouts)):  
-    plot_general(cutouts[i], colorbar=True, cmap="hot", title=f"Plot raw {i}", scale=20)
-    
-#%%
-"Create unsharp masks"
-unsharp_masks = []
-masks = []
-gaussians = []
-for i in tqdm(range(0, len(cutouts))):
-    um, mask, gaus = unsharp_mask(cutouts[i], sigma=30, k=5)
-    unsharp_masks.append(um)
-    masks.append(mask)
-    gaussians.append(gaus)
-
-#%%
-"Plot unsharp masks"
-for i in range(0, len(cutouts)):  
-    plot_general(unsharp_masks[i], colorbar=True, vmin=None, vmax=1, cmap="hot", title=f"Unsharp mask {i}", scale=20)
-    
-#%%
-"Creating different Gausians"
-
-
-#%%
+"""
 "Work in prgress, är nog lite knas"
 threshhold_global = []
 threshhold_global_mask = []
@@ -186,3 +117,4 @@ for i in tqdm(range(0, len(unsharp_masks))):
     plot_image(result_mask/np.linalg.norm(result_mask), "test threshholding")
     #threshhold_local.append(result)
     #threshhold_local_mask.append(np.linalg.norm(result_mask))
+"""
