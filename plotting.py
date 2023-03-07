@@ -67,3 +67,9 @@ def plot_image(func, title, save=False, dpi=None):
     if save:
         plt.savefig(f"{title}.png", dpi=300, bbox_inches=0)
     plt.show()
+
+
+def plot_spectrum(im_fft):
+    # A logarithmic colormap
+    plt.imshow(np.abs(im_fft), norm=colors.LogNorm(vmin=5))
+    plt.colorbar()

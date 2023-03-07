@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import matplotlib.colors as colors
 
 from plotting import *
 
@@ -11,7 +10,10 @@ from skimage.filters import gaussian, unsharp_mask, threshold_otsu, threshold_lo
 
 import numpy as np
 from tqdm import tqdm
+import scipy.fft as scifft
+from scipy.ndimage import gaussian_filter
 
+from enum import Enum
 from typing import Tuple
 
 
@@ -24,6 +26,18 @@ The lab computers can load the entire image in about 3 mins
 There is only one HDU (the primary one), we could add our masks to the same FITS file
 """
 
+
+# Functions using this decorator can either be called directly, or called via the .plot(<input>) attribute and be plotted simultaniously
+def plottable(fig_index, **fig_kwargs):
+    def plot_func(func_to_plot, *args, **kwargs):
+        ret_val = func_to_plot(*args, **kwargs)
+        plot_general(ret_val, fig_index=fig_index, **fig_kwargs)
+        return ret_val
+
+    def decorator(func):
+        func.plot = lambda *args, **kwargs: plot_func(func, *args, **kwargs)
+        return func
+    return decorator
 
 
 class SeedClassifier:
@@ -49,24 +63,56 @@ class SeedClassifier:
     def run(self):
         
         for i, cutout in enumerate(tqdm(self.cutouts)):
-            print(cutout)
-            plot_general(cutout, colorbar=True, title=f"Original {i+1}", scale=40)
+            plot_general(cutout, title=f"Original {i+1}", scale=40, fig_index=1)
 
-            plot_general(self.unsharp_mask_basic(cutout), title=f"Applied unsharp masking {i+1}")
-        
-            # plot_general(unsharp_masks[i], colorbar=True, vmin=None, vmax=1, cmap="hot", title=f"Unsharp mask {i}", scale=20)
+            self.unsharp_mask_basic.plot(cutout)
+            
+        plt.show()
 
-            # plot_general(self.unsharp_mask_fft())
-            # plot_general(self.highpass())
-            # plot_general(self.lowpass())
-
-    def unsharp_mask_basic(self, img, kernel_size=1, weight=1, threshold=None):
+    @plottable(fig_index=9, title="Basic unsharp masking")
+    def unsharp_mask_basic(img, kernel_size=1, weight=1.0, hi_threshold=None):
         gaus = gaussian(img, sigma=kernel_size)
         mask = img - gaus
         applied = img + weight * mask
-        if threshold:
-            applied[applied >= threshold] = threshold
-        return applied
+        if hi_threshold:
+            applied[applied >= hi_threshold] = hi_threshold
+        return mask, applied
+
+
+    def unsharp_mask_fft(self, img, kernel_size=1, weight=1, lo_threshold=0.02, hi_threshold=None):
+        img_freqs = scifft.fft2(img)
+        return None
+        """
+        gaus_low_freq_filter_mask = gaussian_filter(input, sigma, order=0, output=None, mode='reflect', cval=0.0, truncate=4.0, *, radius=None)
+
+        D0 = 10
+        for u in range(M):
+            for v in range(N):
+                D = np.sqrt((u-M/2)**2 + (v-N/2)**2)
+                H[u,v] = np.exp(-D**2/(2*D0*D0))
+        """
+
+    def low_pass_filter_fourier(self, img, lo_threshold_percentage=0.02):
+        
+        fourier2d = scifft.fft2(img)
+
+        # plot_general(fourier2d, dpi=300, colorbar=True, cmap="hot", title="Test plot Fourier 1", scale=20)
+
+        plt.title("Fourier Transform")
+        plot_spectrum(fourier2d)
+
+        fouriercopy = fourier2d.copy()
+        row, column = fourier2d.shape
+        fouriercopy[int(row*lo_threshold_percentage):int(row*(1-lo_threshold_percentage))] = 0
+        fouriercopy[:, int(column*lo_threshold_percentage):int(column*(1-lo_threshold_percentage))] = 0
+
+        plt.figure()
+        plot_spectrum(fouriercopy)
+        plt.title("Low Filtered Fourier Transform")
+
+        fourierfiltered = scifft.ifft2(fouriercopy).real
+
+        plot_general(fourierfiltered, dpi=300, colorbar=True, cmap="hot", title="Reconstructed image", scale=20)
 
 
 if __name__ == "__main__":
@@ -74,8 +120,8 @@ if __name__ == "__main__":
     
     src_path = "src_data/PROMISE-Q1-8micron-filled-v0_3.fits"
 
-    X_LOWER, X_UPPER = 115_000, 120_000
-    Y_LOWER, Y_UPPER = 7_000, 9_000
+    X_LOWER, X_UPPER = 118_300, 118_900
+    Y_LOWER, Y_UPPER = 8_400, 9_000
 
     sc = SeedClassifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
     sc.run()
