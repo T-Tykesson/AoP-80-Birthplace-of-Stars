@@ -27,7 +27,8 @@ There is only one HDU (the primary one), we could add our masks to the same FITS
 """
 
 
-# Functions using this decorator can either be called directly, or called via the .plot(<input>) attribute and be plotted simultaniously
+# Functions using this decorator can either be called directly, 
+# or called via the .plot(<input>) attribute and whatever is returned is plotted simultaniously
 def plottable(fig_index, **fig_kwargs):
     def plot_func(func_to_plot, *args, **kwargs):
         ret_val = func_to_plot(*args, **kwargs)
@@ -40,7 +41,7 @@ def plottable(fig_index, **fig_kwargs):
     return decorator
 
 
-class SeedClassifier:
+class Classifier:
     def __init__(self, promise_path: str, limits: Tuple, single_slice=True):
 
         self.cutouts = []
@@ -63,13 +64,18 @@ class SeedClassifier:
     def run(self):
         
         for i, cutout in enumerate(tqdm(self.cutouts)):
-            plot_general(cutout, title=f"Original {i+1}", scale=40, fig_index=1)
+            # plot_general(cutout, title=f"Original {i+1}", scale=40, fig_index=1)
 
-            self.unsharp_mask_basic.plot(cutout)
+            Classifier.unsharp_mask_basic(cutout)
+
+            for r in tqdm([3, 10, 30, 60]):
+                lp_results = Classifier.low_pass_filter_fourier(cutout, lp_filter_radius=r)
+                plot_general(lp_results[0], title=f"Original, r={r}")
+                plot_general(lp_results[-1], title=f"After low pass filter using ft, r={r}")
             
         plt.show()
 
-    @plottable(fig_index=9, title="Basic unsharp masking")
+    @plottable(fig_index=1, title="Basic unsharp masking")
     def unsharp_mask_basic(img, kernel_size=1, weight=1.0, hi_threshold=None):
         gaus = gaussian(img, sigma=kernel_size)
         mask = img - gaus
@@ -78,21 +84,39 @@ class SeedClassifier:
             applied[applied >= hi_threshold] = hi_threshold
         return mask, applied
 
+    def gaussian_lp_mask(radius, shape):
+        mask = np.zeros(shape)
+        center = np.array((shape[0]/2, shape[1]/2))
+        for y in range(shape[0]):
+            for x in range(shape[1]):
+                distance_to_center = np.linalg.norm(np.array((x, y)) - center)
+                mask[y,x] = np.exp(-distance_to_center**2 / (2*radius*radius))
+        return mask
 
-    def unsharp_mask_fft(self, img, kernel_size=1, weight=1, lo_threshold=0.02, hi_threshold=None):
-        img_freqs = scifft.fft2(img)
-        return None
-        """
-        gaus_low_freq_filter_mask = gaussian_filter(input, sigma, order=0, output=None, mode='reflect', cval=0.0, truncate=4.0, *, radius=None)
+    @plottable(fig_index=2, title="Unsharp masking using the frequency domain")
+    def low_pass_filter_fourier(img, lp_filter_radius=100, weight=1, lo_threshold=0.02, hi_threshold=None):
+        img_freqs = np.fft.fft2(img)
 
-        D0 = 10
-        for u in range(M):
-            for v in range(N):
-                D = np.sqrt((u-M/2)**2 + (v-N/2)**2)
-                H[u,v] = np.exp(-D**2/(2*D0*D0))
-        """
+        centered_img_freqs = np.fft.fftshift(img_freqs)
 
-    def low_pass_filter_fourier(self, img, lo_threshold_percentage=0.02):
+        gaus_low_freq_filter_mask = Classifier.gaussian_lp_mask(radius=lp_filter_radius, shape=img_freqs.shape)
+
+        filtered_centered_img_freqs = centered_img_freqs * gaus_low_freq_filter_mask
+
+        filtered_img_freqs = np.fft.ifftshift(filtered_centered_img_freqs)
+
+        filtered_img = np.fft.ifft2(filtered_img_freqs)
+
+        # When returning, return log of the abs value of frequencies for more viewable plots
+        return  img, \
+                np.log(1+np.abs(img_freqs)), \
+                np.log(1+np.abs(centered_img_freqs)), \
+                gaus_low_freq_filter_mask, \
+                np.log(1+np.abs(filtered_img_freqs)), \
+                np.abs(filtered_img)
+
+
+    def unsharp_mask_fft(img, lo_threshold_percentage=0.02):
         
         fourier2d = scifft.fft2(img)
 
@@ -120,10 +144,13 @@ if __name__ == "__main__":
     
     src_path = "src_data/PROMISE-Q1-8micron-filled-v0_3.fits"
 
-    X_LOWER, X_UPPER = 118_300, 118_900
-    Y_LOWER, Y_UPPER = 8_400, 9_000
+    # X_LOWER, X_UPPER = 118_300, 118_900
+    # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    sc = SeedClassifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
+    X_LOWER, X_UPPER = 117_000, 119_000
+    Y_LOWER, Y_UPPER = 5_500, 6_500
+
+    sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
     sc.run()
 
 """
