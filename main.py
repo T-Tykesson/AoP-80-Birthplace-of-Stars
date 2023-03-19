@@ -64,14 +64,11 @@ class Classifier:
     def run(self):
         
         for i, cutout in enumerate(tqdm(self.cutouts)):
-            # plot_general(cutout, title=f"Original {i+1}", scale=40, fig_index=1)
 
-            Classifier.unsharp_mask_basic(cutout)
-
-            for r in tqdm([3, 10, 30, 60]):
+            for r in tqdm([30]):
                 lp_results = Classifier.low_pass_filter_fourier(cutout, lp_filter_radius=r)
                 plot_general(lp_results[0], title=f"Original, r={r}")
-                plot_general(lp_results[-1], title=f"After low pass filter using ft, r={r}")
+                plot_general(lp_results[1:], title=f"After low pass filter using ft, r={r}")
             
         plt.show()
 
@@ -84,16 +81,19 @@ class Classifier:
             applied[applied >= hi_threshold] = hi_threshold
         return mask, applied
 
-    def gaussian_lp_mask(radius, shape):
+
+    @plottable(fig_index=2, title="Gaussian lp mask")
+    def gaussian_lp_mask(radius: int, shape):
         mask = np.zeros(shape)
         center = np.array((shape[0]/2, shape[1]/2))
         for y in range(shape[0]):
             for x in range(shape[1]):
-                distance_to_center = np.linalg.norm(np.array((x, y)) - center)
+                distance_to_center = np.linalg.norm(np.array((y, x)) - center)
                 mask[y,x] = np.exp(-distance_to_center**2 / (2*radius*radius))
         return mask
 
-    @plottable(fig_index=2, title="Unsharp masking using the frequency domain")
+
+    @plottable(fig_index=3, title="Unsharp masking using the frequency domain")
     def low_pass_filter_fourier(img, lp_filter_radius=100, weight=1, lo_threshold=0.02, hi_threshold=None):
         img_freqs = np.fft.fft2(img)
 
@@ -112,6 +112,7 @@ class Classifier:
                 np.log(1+np.abs(img_freqs)), \
                 np.log(1+np.abs(centered_img_freqs)), \
                 gaus_low_freq_filter_mask, \
+                np.log(1+np.abs(filtered_centered_img_freqs)), \
                 np.log(1+np.abs(filtered_img_freqs)), \
                 np.abs(filtered_img)
 

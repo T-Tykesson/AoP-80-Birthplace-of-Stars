@@ -28,7 +28,7 @@ def plot_general(functions, dpi=60, fig_size=(30,13), title = None, cmap="hot", 
         
         im = axis[xi][i%num_cols].imshow(func, origin="lower", cmap=cmap)
         
-        axis[xi][i%3].grid(alpha=0.05) if grid else axis[xi][i%num_cols].grid(alpha=0)
+        axis[xi][i%num_cols].grid(alpha=0.05) if grid else axis[xi][i%num_cols].grid(alpha=0)
 
         if colorbar:
             divider = make_axes_locatable(axis[xi][i%num_cols])
