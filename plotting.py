@@ -4,33 +4,36 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+from math import ceil
 
 def plot_general(functions, dpi=60, fig_size=(30,13), title = None, cmap="hot", scale=1, grid=False, colorbar=True, fig_index=None):
-    
+
+    num_cols = 3
+
     # plt.figure(fig_index, figsize=fig_size, dpi=dpi)
     
     # If two functions/imgs are passed, draw them both in the same plot
     if not isinstance(functions, tuple):
         functions = (functions,)
     
-    fig, axis = plt.subplots(1, len(functions), figsize=fig_size, dpi=dpi)
-    if isinstance(axis, Axes):
-        axis = (axis,)
+    fig, axis = plt.subplots(ceil(len(functions)/3), min(len(functions), 3), figsize=fig_size, dpi=dpi, squeeze=False)
     
     if title != None: 
         fig.suptitle(f"{title}")
     
+    xi = -1
     for i, func in enumerate(functions):
-        im = axis[i].imshow(func, origin="lower", cmap=cmap)
+        if (i%num_cols == 0):
+            xi += 1
         
-        axis[i].grid(alpha=0.05) if grid else axis[i].grid(alpha=0)
+        im = axis[xi][i%num_cols].imshow(func, origin="lower", cmap=cmap)
+        
+        axis[xi][i%3].grid(alpha=0.05) if grid else axis[xi][i%num_cols].grid(alpha=0)
 
         if colorbar:
-            divider = make_axes_locatable(axis[i])
+            divider = make_axes_locatable(axis[xi][i%num_cols])
             cax = divider.append_axes("right", size="5%", pad=0.05)
             plt.colorbar(im, cax=cax)
-        
     plt.draw()
 
 
