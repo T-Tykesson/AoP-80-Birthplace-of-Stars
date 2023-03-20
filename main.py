@@ -93,7 +93,7 @@ class Classifier:
         return mask
 
 
-    @plottable(fig_index=3, title="Unsharp masking using the frequency domain")
+    @plottable(fig_index=3, title="Low pass filter using the frequency domain")
     def low_pass_filter_fourier(img, lp_filter_radius=100, weight=1, lo_threshold=0.02, hi_threshold=None):
         img_freqs = np.fft.fft2(img)
 
@@ -108,8 +108,7 @@ class Classifier:
         filtered_img = np.fft.ifft2(filtered_img_freqs)
 
         # When returning, return log of the abs value of frequencies for more viewable plots
-        return  img, \
-                np.log(1+np.abs(img_freqs)), \
+        return  np.log(1+np.abs(img_freqs)), \
                 np.log(1+np.abs(centered_img_freqs)), \
                 gaus_low_freq_filter_mask, \
                 np.log(1+np.abs(filtered_centered_img_freqs)), \
