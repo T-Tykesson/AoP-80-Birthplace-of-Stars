@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from math import ceil
+from tqdm import tqdm
 
 def plot_general(functions, dpi=60, fig_size=(30,13), title = None, cmap="hot", scale=1, grid=False, colorbar=True, fig_index=None):
 
@@ -36,7 +37,74 @@ def plot_general(functions, dpi=60, fig_size=(30,13), title = None, cmap="hot", 
             plt.colorbar(im, cax=cax)
     plt.draw()
 
+def plot(function, dpi=100, fig_size=(30,13), title = None, norm=None, vmin=None, vmax=None, cmap="gray_r", scale=1, grid=False, colorbar=False):
+    plt.figure(figsize=fig_size, dpi=dpi)
+    ax = plt.gca()
+    im = ax.imshow(function, origin="lower", cmap=cmap, vmin=vmin, vmax=vmax, norm=norm)
+    
+    if title != None: 
+        plt.title(f"{title}")
+    
+    if grid:
+        plt.grid(alpha=0.05)
+    else:
+        plt.grid(alpha=0)
+        
+    if colorbar:
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        
+    plt.show()
+    
+def blob_plot(blob_log_list, data, ylow, yhigh, xlow, xhigh, dpi=100, cmap="inferno"):
+    title="laplacian of gaussian"
+    
+    fig, ax = plt.subplots(figsize=(90, 30), sharex=True, sharey=True, dpi=dpi)
+    ax.set_title(title)
+    ax.imshow(data, cmap=cmap, origin="lower", vmin=(np.mean(data)-1*np.std(data)), vmax=(np.mean(data)+4*np.std(data)))
+    #ax.imshow(final_mask, origin="lower", norm=Normalize(0, 1))
+    
+    for blob in tqdm(blob_log_list):
+        y, x, r = blob
+        c = plt.Circle((x, y), 2*r, color="red", linewidth=2, fill=False)
+        ax.add_patch(c)
+        
+    print("Rendering...")
+    ax.set_axis_off()
+     
+    plt.ylim(ylow, yhigh)
+    plt.xlim(xlow, xhigh)
+    plt.tight_layout()
+    plt.show()
+    print("Done")
 
+            
+def blob_plot_multiple(detection_list, data_list, ylow, yhigh, xlow, xhigh, dpi=100, cmap="inferno"):
+    k = 0
+    for blob_log_list in tqdm(detection_list):
+            title=f"laplacian of gaussian {k}"
+            
+            fig, ax = plt.subplots(figsize=(90, 30), sharex=True, sharey=True, dpi=dpi)
+            ax.set_title(title)
+            ax.imshow(data_list[k], cmap=cmap, origin="lower", vmin=(np.mean(data_list[k])-1*np.std(data_list[k])), vmax=(np.mean(data_list[k])+4*np.std(data_list[k])))
+            #ax.imshow(final_mask, origin="lower", norm=Normalize(0, 1))
+            
+            for blob in tqdm(blob_log_list):
+                y, x, r = blob
+                c = plt.Circle((x, y), 2*r, color="red", linewidth=2, fill=False)
+                ax.add_patch(c)
+                
+            print("Rendering...")
+            ax.set_axis_off()
+             
+            plt.ylim(ylow, yhigh)
+            plt.xlim(xlow, xhigh)
+            plt.tight_layout()
+            plt.show()
+            print("Done")
+            k += 1
+     
 def plot_figure(func, title, norm=None, dpi=None):
     plt.figure()
     if dpi:
@@ -56,7 +124,6 @@ def plot_figure(func, title, norm=None, dpi=None):
     plt.colorbar(im, cax=cax)
     plt.show()
 
-
 def plot_image(func, title, save=False, dpi=None):
     plt.figure()
     plt.axis('off')
@@ -71,8 +138,8 @@ def plot_image(func, title, save=False, dpi=None):
         plt.savefig(f"{title}.png", dpi=300, bbox_inches=0)
     plt.show()
 
-
 def plot_spectrum(im_fft):
     # A logarithmic colormap
     plt.imshow(np.abs(im_fft), norm=colors.LogNorm(vmin=5))
     plt.colorbar()
+    
