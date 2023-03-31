@@ -34,7 +34,7 @@ def check_for_symmetry(peaksmax, peaksmin, margin_of_error):
     
 
 full_data = False #Ändra till false om man inte vill dela upp hela datan
-file_path = "C:/Users/joaki/Pictures/Q1-latest-whigal-85.fits"
+file_path = "Q1-latest-whigal-85.fits"
 
 if full_data:
     data_list = []
@@ -49,16 +49,16 @@ if full_data:
                 data_list.append(cutout)
 else:
     data = fits.getdata(file_path)
-    x_low = 11840*5
-    x_high = 11875*5
-    y_low = 725*5
-    y_high = 755*5
+    x_low = 15470*5
+    x_high = 15495*5
+    y_low = 575*5
+    y_high = 595*5
     data = data[y_low:y_high, x_low:x_high]
     
 
 maxim = data.argmax()
 index = np.unravel_index(maxim, data.shape)
-print(index)
+#print(index)
 plotting.plot_figure(data,"Artefakt")
 
 size = 40
@@ -70,13 +70,13 @@ peaksh, _ = find_peaks(datap) #List of local maxima
 peaksl, _ = find_peaks(-datap) #List of local minima
 
 
-print(size-peaksl)
-print(size-peaksh)
+#print(size-peaksl)
+#print(size-peaksh)
 
-plt.plot(peaksh, datap[peaksh], "x")
-plt.plot(peaksl, datap[peaksl], 'x')
-plt.plot(X,datap)
-plt.show()
+#plt.plot(peaksh, datap[peaksh], "x")
+#plt.plot(peaksl, datap[peaksl], 'x')
+#plt.plot(X,datap)
+#plt.show()
 
 def create_circular_mask(h, w, center=None, radius=None):
     if center is None: # use the middle of the image
@@ -98,11 +98,10 @@ center = (index[1], index[0])
 
 def check_circular(data, radius_max):
     aver = np.zeros(radius_max)
+    aver[0] = data[index[0],index[1]]
     for r in range(1,radius_max):
         mask = create_circular_mask(h,w, center = center, radius = r)
-        aver[r] = np.mean(mask*data)
-        #plotting.plot_figure(mask*data,'test')
-    aver[0] = data[index[0],index[1]]
+        aver[r] = np.sum(mask*data)/(mask > 0).sum()
     return aver
     
 aver = check_circular(data, 40)
