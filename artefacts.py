@@ -80,7 +80,7 @@ else:
 maxim = data.argmax()
 index = np.unravel_index(maxim, data.shape)
 #print(index)
-plotting.plot_figure(data,"Artefakt")
+#plotting.plot_figure(data,"Artefakt")
 
 size = 40
 
@@ -91,9 +91,9 @@ peaksh, _ = find_peaks(datap) #List of local maxima
 peaksl, _ = find_peaks(-datap) #List of local minima
 
 
-print(size-peaksl)
-print(size-peaksh)
-print(check_for_symmetry((size-peaksh), (size-peaksl), strictness))
+#print(size-peaksl)
+#print(size-peaksh)
+#print(check_for_symmetry((size-peaksh), (size-peaksl), strictness))
 
 #plt.plot(peaksh, datap[peaksh], "x")
 #plt.plot(peaksl, datap[peaksl], 'x')
@@ -113,7 +113,7 @@ def create_circular_mask(h, w, center=None, radius=None):
 
     mask_inner = dist_from_center <= (radius-1)
     mask_outer = dist_from_center <= radius
-    mask = masko^maski
+    mask = mask_outer^mask_inner
     return mask
 
 ## Takes the average intensity of the ring at radius r. Center is the center of the dense core, h = height of data and w = width of data, radius_max is the total size of the circle.
@@ -133,8 +133,7 @@ def plot_intensity2radius(data, center, h, w, radius_max):
 
 def distance_minima(data, center, h, w, radius_max):
     aver = check_circular(data, center, h, w, radius_max)
-    func = (range(len(aver)),aver)
-    peak, _ = find_peaks(-func, width=(0,20))
+    peak, _ = find_peaks(-aver, width=(0,20))
     return peak
 
 
@@ -148,12 +147,14 @@ def find_artefacts(data, y_low, y_high, x_low, x_high, radius_max=40):
     center = (index[1], index[0])
     plotting.plot_figure(data_slice,"Artefakt")
     plot_intensity2radius(data_slice, center, h, w, radius_max)
+    print(distance_minima(data_slice, center, h, w, radius_max))
+    
 
 
 
 "Test"
 
-file_path = "C:/Users/Tage/Programmering/AoP80/Q1-latest-whigal-85.fits"
+file_path = "Q1-latest-whigal-85.fits"
 x_low = 15470*5
 x_high = 15495*5
 y_low = 575*5
