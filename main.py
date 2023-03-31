@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
+import skimage
 
 from plotting import *
+import definition
 
 from astropy.io import fits
 from astropy.utils.data import get_pkg_data_filename
@@ -15,6 +17,7 @@ from scipy.ndimage import gaussian_filter
 
 from enum import Enum
 from typing import Tuple
+import pywt
 
 
 # Notes:
@@ -61,16 +64,6 @@ class Classifier:
             else:
                 self.cutouts.append(fits_data["PRIMARY"].data[ limits[0]:limits[1], limits[2]:limits[3] ])
     
-    def run(self):
-        
-        for i, cutout in enumerate(tqdm(self.cutouts)):
-
-            for r in tqdm([30]):
-                lp_results = Classifier.low_pass_filter_fourier(cutout, lp_filter_radius=r)
-                plot_general(lp_results[0], title=f"Original, r={r}")
-                plot_general(lp_results[1:], title=f"After low pass filter using ft, r={r}")
-            
-        plt.show()
 
     @plottable(fig_index=1, title="Basic unsharp masking")
     def unsharp_mask_basic(img, kernel_size=1, weight=1.0, hi_threshold=None):
@@ -116,6 +109,11 @@ class Classifier:
                 np.abs(filtered_img)
 
 
+    @plottable(fig_index=4, title="Wavelet")
+    def discrete_2d_wavelet(data, levels):
+        return pywt.wavedec2(data, 'haar', level=levels)
+    
+    
     def unsharp_mask_fft(img, lo_threshold_percentage=0.02):
         
         fourier2d = scifft.fft2(img)
@@ -138,11 +136,60 @@ class Classifier:
 
         plot_general(fourierfiltered, dpi=300, colorbar=True, cmap="hot", title="Reconstructed image", scale=20)
 
+    def run(self): 
+
+        # Definition parameters
+        length = 201  # Size of box to expand around peaks
+        mult = 3  # Factor that peak has to exceed surrounding standard deviation
+        lowest_peak_height = 5  # Minimum above surrounding mean value
+        check_bbox_size = 11  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
+        wavlet_levels = 3  # NUmber of levels to run wavelet
+        wavelet_absolute_threshold = 1  # Aboslute mimimum of the summed wavlet peaks
+
+        for i, slice in enumerate(tqdm(self.cutouts)):
+
+            # Full pipeline using wavelet
+            # Unsharp mask > Thresholding > Wavelet > Defentition check > List of cores
+
+            smoothed = gaussian(slice, sigma=1)
+
+            # Run a 'haar' wavelet function over the data
+            w = Classifier.discrete_2d_wavelet(slice, wavlet_levels)
+            w_sums = w[1][0] + w[1][1] + w[1][2]  # Sum the horizontal, vertical, and diagonal return values
+
+            # Resize summed wavelet and calculate mask
+            w_sums = skimage.transform.resize(w_sums, slice.shape)
+            w_mask = w_sums > wavelet_absolute_threshold
+
+            # Create a mask of only the peaks
+            local_maxes = skimage.feature.peak_local_max(slice, min_distance=10, labels = definition.pad_mask(w_mask, check_bbox_size))
+            peaks_mask = np.zeros(slice.shape, dtype=bool)
+            peaks_mask[local_maxes[:, 0], local_maxes[:, 1]] = True
+            
+            # Test against definition
+            dense_cores_mask = definition.test_def(slice, peaks_mask, length, mult, lowest_peak_height)
+            padded_dense_core_mask = definition.pad_mask(dense_cores_mask, 51)
+            
+            dense_cores_values = slice[dense_cores_mask]
+            padded_dense_cores = np.where(padded_dense_core_mask, slice, 0)
+            plot_general(padded_dense_cores)
+
+
+            """
+            # Lowpass Example
+            for r in tqdm([5, 30, 60]):
+                
+                lp_results = Classifier.low_pass_filter_fourier(slice, lp_filter_radius=r)
+                plot_general(lp_results[0], title=f"Original, r={r}")
+                plot_general(lp_results[1:], title=f"After low pass filter using ft, r={r}")
+            """
+            
+        plt.show()
 
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = "src_data/PROMISE-Q1-8micron-filled-v0_3.fits"
+    src_path = "src_data/Q1-latest-whigal-85.fits"
 
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
@@ -152,42 +199,3 @@ if __name__ == "__main__":
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
     sc.run()
-
-"""
-"Work in prgress, är nog lite knas"
-threshhold_global = []
-threshhold_global_mask = []
-for i in tqdm(range(0, len(unsharp_masks))):
-    data = cutouts[i]
-    mask = unsharp_masks[i]
-    
-    threshhold = threshold_otsu(mask, nbins=256)
-    result_mask = ((mask) > threshhold)#* mask
-    result_mask_1 = ((mask) > threshhold)* mask
-    
-    plot_figure(data, "global threshhold")
-    plot_figure(result_mask/np.linalg.norm(result_mask), "global threshold on mask")
-    threshhold_global_mask.append(result_mask)
-
-#%%
-"Work in prgress, är nog lite knas"
-
-threshhold_local = []
-threshhold_local_mask = []
-for i in tqdm(range(0, len(unsharp_masks))):
-    data = cutouts[i]
-    mask = unsharp_masks[i]
-    #b = threshold_local(data, block_size=3, method='gaussian', offset=0, mode='reflect', param=None, cval=0)
-    #result = ((data) > b) * data
-    
-    c = threshold_local(mask, block_size=3, method='gaussian', offset=-1, mode='reflect', param=None, cval=0)
-    result_mask = ((mask) > c)
-    
-    plot_figure(data, "Initial data", colors.Normalize(0,1))
-    plot_figure(mask, "Unsharp mask", colors.Normalize(0,1))
-    #plot_figure(result, "local threshhold on data")
-    plot_figure(result_mask, "local threshold on mask", colors.Normalize(0,1),)
-    plot_image(result_mask/np.linalg.norm(result_mask), "test threshholding")
-    #threshhold_local.append(result)
-    #threshhold_local_mask.append(np.linalg.norm(result_mask))
-"""
