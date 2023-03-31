@@ -11,6 +11,7 @@ def absolute_symmetry(value1, value2, margin):
     else:
         return False
 
+#Checks if there is symmetry in the peaks and if there is a significant difference beteween minima and maxima
 def check_for_symmetry(peaksmax, peaksmin, margin_of_error):
     center_index = None
     min_start1 = 0
@@ -20,10 +21,14 @@ def check_for_symmetry(peaksmax, peaksmin, margin_of_error):
     for i in range(len(peaksmax)):
         if peaksmax[i] == 0:
             center_index = i
+            max_left = i-1
+            max_right = i + 1
     
     if center_index == None:
         print("Center index = null")
         return False
+    elif  max_left < 0 or max_right > len(peaksmax):
+        print("Lacking minima or maxima on sides")
     
     for i in range(len(peaksmin)):
         if peaksmin[i] > 0 and peaksmin[min_start2] < 0:
@@ -31,10 +36,22 @@ def check_for_symmetry(peaksmax, peaksmin, margin_of_error):
             break
         min_start2 += 1
         
-    if absolute_symmetry(peaksmax[center_index - 1], peaksmax[center_index + 1], margin_of_error) and absolute_symmetry(peaksmin[min_start1], peaksmin[min_start2], margin_of_error):
-        symmetry = True
+    if absolute_symmetry(peaksmax[max_left], peaksmax[max_right], margin_of_error) and absolute_symmetry(peaksmin[min_start1], peaksmin[min_start2], margin_of_error):
+        if significance_of_peak(peaksmax[max_left], min_start1, minimum_peak_diff) and significance_of_peak(peaksmax[max_right] , min_start2, minimum_peak_diff):
+            symmetry = True
+    else:
+            symmetry = False
     
     return symmetry
+
+def significance_of_peak(local_max, local_min, threshold): #Checks if given values are significantly different
+    if datap[local_max] - datap[local_min] > threshold:
+        return True
+    else:
+        return False
+
+minimum_peak_diff = 15
+strictness = 1
 
 full_data = False #Ändra till false om man inte vill dela upp hela datan
 file_path = "Q1-latest-whigal-85.fits"
@@ -51,11 +68,11 @@ if full_data:
                 cutout = hdul[0].section[yslice*i:yslice*i + yslice, xslice*j:xslice*j+xslice]
                 data_list.append(cutout)
 else:
-    x_low = 15470*5
-    x_high = 15495*5
-    y_low = 575*5
-    y_high = 595*5
     data = fits.getdata(file_path)
+    x_low = 11540*5
+    x_high = 11565*5
+    y_low = 636*5
+    y_high = 656*5
     data = data[y_low:y_high, x_low:x_high]
     
 
@@ -72,9 +89,10 @@ X = np.linspace(0,2*size-1, num=2*size)
 peaksh, _ = find_peaks(datap) #List of local maxima
 peaksl, _ = find_peaks(-datap) #List of local minima
 
+
 print(size-peaksl)
 print(size-peaksh)
-print(check_for_symmetry((size-peaksh), (size-peaksl), 1))
+print(check_for_symmetry((size-peaksh), (size-peaksl), strictness))
 
 #plt.plot(peaksh, datap[peaksh], "x")
 #plt.plot(peaksl, datap[peaksl], 'x')
