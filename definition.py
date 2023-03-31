@@ -4,6 +4,7 @@ from matplotlib.colors import LogNorm, Normalize, LightSource
 from astropy.io import fits
 import numpy as np
 from matplotlib import cm
+from matplotlib.ticker import LinearLocator
 from sys import exit
 
 # Returns the indexes of the squares (with a given length) around the 1:s in the mask.
@@ -156,3 +157,40 @@ def plot_def(index_arr, x_view, arr):
         plt.axvline(x = lengths[i]//2, color="black")
 
         plt.show()
+
+def plot_def_3d(index_arr, x_view, y_view, arr, dpi=100, degree=90):
+    data, length, mult, lowest_val, def_rows, def_cols, stds, means, lengths, test = arr
+    
+    for i in index_arr:
+        if i > len(def_rows) - 1:
+            break
+    
+        xstart = max(def_cols[i]-x_view, 0)
+        xend = min(def_cols[i]+x_view+1, len(arr[0][0]))
+        
+        ystart = max(def_rows[i]-y_view, 0)
+        yend = min(def_rows[i]+y_view+1, len(arr[0][0]))
+        
+        data_slice = data[ystart:yend, xstart:xend]
+        X = np.arange(xstart, xend, 1)
+        Y = np.arange(ystart, yend, 1)
+        X, Y = np.meshgrid(X, Y)
+        Z = data_slice
+        
+        fig = plt.figure(figsize=(20,20), dpi=dpi)
+        plt.title(str(i) + ": " + "(" + str(def_cols[i]) + ", " + str(def_rows[i]) + ") " + str(test[i]))
+        
+        for i in range(4):
+            ax = fig.add_subplot(2, 2, i+1, projection='3d')
+            ax.view_init(elev=30, azim=degree*i)
+            # Make data.
+
+            # Plot the surface.
+            surf = ax.plot_surface(X, Y, Z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+
+            # Customize the z axis.
+            ax.set_zlim(-1.01, np.max(data_slice)+1)
+            ax.zaxis.set_major_locator(LinearLocator(10))
+            #ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+        plt.show()
+        
