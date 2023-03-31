@@ -151,6 +151,22 @@ def find_artefacts(data, y_low, y_high, x_low, x_high, radius_max=40):
     
 
 
+def find_artefacts_from_coords(data, coords, width, radius_max=40):
+    #coords is y,x coordinates tuples
+    for i in range(len(coords)):
+        y, x = coords[i]
+        center = y, x
+        y_low = y - width
+        y_high = y + width
+        x_low = x - width
+        y_high = y + width
+        h = y_high - y_low   
+        w = x_high - x_low
+        
+        data_slice = data[y_low:y_high, x_low:x_high]
+        plotting.plot_figure(data_slice,"Artefakt")
+        plot_intensity2radius(data_slice, center, h, w, radius_max)
+
 
 "Test"
 
@@ -163,6 +179,7 @@ data = get_data.get_data_slice(file_path, 0, 10000, 0, 80000)
 
 find_artefacts(data, y_low, y_high, x_low, x_high)
 
+#%%
 
 
 
