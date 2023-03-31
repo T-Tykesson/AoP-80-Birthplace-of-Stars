@@ -13,7 +13,7 @@ def plot_general(functions, dpi=60, fig_size=(30,13), title = None, cmap="hot", 
 
     # plt.figure(fig_index, figsize=fig_size, dpi=dpi)
     
-    # If two functions/imgs are passed, draw them both in the same plot
+    # If more than one functions/imgs are passed, draw them in the same plot
     if not isinstance(functions, tuple):
         functions = (functions,)
     
