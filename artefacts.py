@@ -111,8 +111,8 @@ def create_circular_mask(h, w, center=None, radius=None):
     Y, X = np.ogrid[:h, :w]
     dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
 
-    maski = dist_from_center <= (radius-1)
-    masko = dist_from_center <= radius
+    mask_inner = dist_from_center <= (radius-1)
+    mask_outer = dist_from_center <= radius
     mask = masko^maski
     return mask
 
@@ -131,23 +131,12 @@ def plot_intensity2radius(data, center, h, w, radius_max):
     plt.plot(range(len(aver)), aver)
     plt.show()
 
+def distance_minima(data, center, h, w, radius_max):
+    aver = check_circular(data, center, h, w, radius_max)
+    func = (range(len(aver)),aver)
+    peak, _ = find_peaks(-func, width=(0,20))
+    return peak
 
-'''
-    x_low = 15470*5
-    x_high = 15495*5
-    y_low = 575*5
-    y_high = 595*5
-
-    x_low = 11540*5
-    x_high = 11565*5
-    y_low = 636*5
-    y_high = 656*5
-    
-    x_low = 11840*5
-    x_high = 11875*5
-    y_low = 725*5
-    y_high = 755*5
-'''
 
 def find_artefacts(data, y_low, y_high, x_low, x_high, radius_max=40):
     data_slice = data[y_low:y_high, x_low:x_high]
@@ -175,8 +164,21 @@ find_artefacts(data, y_low, y_high, x_low, x_high)
 
 
 
-#plt.plot(peaksh, datap[peaksh], "x")
-#plt.plot(peaksl, datap[peaksl], 'x')
-#plt.plot(X,datap)
-#plt.show()
 
+
+'''
+    x_low = 15470*5
+    x_high = 15495*5
+    y_low = 575*5
+    y_high = 595*5
+
+    x_low = 11540*5
+    x_high = 11565*5
+    y_low = 636*5
+    y_high = 656*5
+    
+    x_low = 11840*5
+    x_high = 11875*5
+    y_low = 725*5
+    y_high = 755*5
+'''
