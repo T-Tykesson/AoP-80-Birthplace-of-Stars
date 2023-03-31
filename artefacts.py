@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from tqdm import tqdm
 
-def absolute_symmetry(value1, value2):
-    if abs(value1) == abs(value2):
+def absolute_symmetry(value1, value2, margin):
+    if abs(value1) == abs(value2) or abs(value1) == abs(value2) + margin or abs(value1) == abs(value2) - margin:
         return True
     else:
         return False
@@ -16,22 +16,25 @@ def check_for_symmetry(peaksmax, peaksmin, margin_of_error):
     min_start1 = 0
     min_start2 = 1
     symmetry = False
-    for i in peaksmax:
-        if i == 0:
+    
+    for i in range(len(peaksmax)):
+        if peaksmax[i] == 0:
             center_index = i
     
     if center_index == None:
         print("Center index = null")
         return False
     
-    for i in range(len.peaksmin):
+    for i in range(len(peaksmin)):
         if peaksmin[i] > 0 and peaksmin[min_start2] < 0:
             min_start1 = i
-            exit
+            break
         min_start2 += 1
-    if peaksmin[center_index+1] == peaksmin[center_index-1] and peaksmax[min_start1] ==peaksmax[min_start1]:
-        return True
+        
+    if absolute_symmetry(peaksmax[center_index - 1], peaksmax[center_index + 1], margin_of_error) and absolute_symmetry(peaksmin[min_start1], peaksmin[min_start2], margin_of_error):
+        symmetry = True
     
+    return symmetry
 
 full_data = False #Ändra till false om man inte vill dela upp hela datan
 file_path = "C:/Users/joaki/Pictures/Q1-latest-whigal-85.fits"
@@ -48,11 +51,15 @@ if full_data:
                 cutout = hdul[0].section[yslice*i:yslice*i + yslice, xslice*j:xslice*j+xslice]
                 data_list.append(cutout)
 else:
+    x_low = 15470*5
+    x_high = 15495*5
+    y_low = 575*5
+    y_high = 595*5
     data = fits.getdata(file_path)
-    x_low = 11840*5
-    x_high = 11875*5
-    y_low = 725*5
-    y_high = 755*5
+    #x_low = 11840*5
+    #x_high = 11875*5
+    #y_low = 725*5
+    #y_high = 755*5
     data = data[y_low:y_high, x_low:x_high]
     
 
@@ -72,6 +79,7 @@ peaksl, _ = find_peaks(-datap) #List of local minima
 
 print(size-peaksl)
 print(size-peaksh)
+print(check_for_symmetry((size-peaksh), (size-peaksl), 1))
 
 plt.plot(peaksh, datap[peaksh], "x")
 plt.plot(peaksl, datap[peaksl], 'x')
