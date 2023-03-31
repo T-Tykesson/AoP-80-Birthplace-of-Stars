@@ -78,6 +78,37 @@ plt.plot(peaksl, datap[peaksl], 'x')
 plt.plot(X,datap)
 plt.show()
 
+def create_circular_mask(h, w, center=None, radius=None):
+    if center is None: # use the middle of the image
+        center = (int(w/2), int(h/2))
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    maski = dist_from_center <= (radius-1)
+    masko = dist_from_center <= radius
+    mask = masko^maski
+    return mask
+
+h = y_high - y_low   
+w = x_high - x_low
+center = (index[1], index[0])
+
+def check_circular(data, radius_max):
+    aver = np.zeros(radius_max)
+    for r in range(1,radius_max):
+        mask = create_circular_mask(h,w, center = center, radius = r)
+        aver[r] = np.mean(mask*data)
+        #plotting.plot_figure(mask*data,'test')
+    aver[0] = data[index[0],index[1]]
+    return aver
+    
+aver = check_circular(data, 40)
+plt.plot(range(len(aver)), aver)
+plt.show()
+
 
 '''
     x_low = 15470*5
