@@ -1,6 +1,7 @@
 import plotting
 from astropy.io import fits
 import numpy as np
+import get_data
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from tqdm import tqdm
@@ -35,52 +36,6 @@ def check_for_symmetry(peaksmax, peaksmin, margin_of_error):
         symmetry = True
     
     return symmetry
-
-full_data = False #Ändra till false om man inte vill dela upp hela datan
-file_path = "Q1-latest-whigal-85.fits"
-
-if full_data:
-    data_list = []
-    xslice = 10000
-    yslice = 7000
-
-    with fits.open(file_path, use_fsspec=True, fsspec_kwargs={"anon": True}) as hdul:  
-       #cutout = hdul[0].section[0:1750, 0:2500] 
-        for i in tqdm(range(0, int(7000/yslice))):
-            for j in tqdm(range(0, int(120000/xslice))):
-                cutout = hdul[0].section[yslice*i:yslice*i + yslice, xslice*j:xslice*j+xslice]
-                data_list.append(cutout)
-else:
-    x_low = 15470*5
-    x_high = 15495*5
-    y_low = 575*5
-    y_high = 595*5
-    data = fits.getdata(file_path)
-    data = data[y_low:y_high, x_low:x_high]
-    
-
-maxim = data.argmax()
-index = np.unravel_index(maxim, data.shape)
-#print(index)
-plotting.plot_figure(data,"Artefakt")
-
-size = 40
-
-datap = data[index[0], (index[1]-size):(index[1]+size)]
-X = np.linspace(0,2*size-1, num=2*size)
-
-peaksh, _ = find_peaks(datap) #List of local maxima
-peaksl, _ = find_peaks(-datap) #List of local minima
-
-print(size-peaksl)
-print(size-peaksh)
-print(check_for_symmetry((size-peaksh), (size-peaksl), 1))
-
-#plt.plot(peaksh, datap[peaksh], "x")
-#plt.plot(peaksl, datap[peaksl], 'x')
-#plt.plot(X,datap)
-#plt.show()
-
 ## Creates a ring with radius=radius with center at center. h = height of data and w = width of data
 def create_circular_mask(h, w, center=None, radius=None):
     if center is None: # use the middle of the image
@@ -99,14 +54,14 @@ def create_circular_mask(h, w, center=None, radius=None):
 ## Takes the average intensity of the ring at radius r. Center is the center of the dense core, h = height of data and w = width of data, radius_max is the total size of the circle.
 def check_circular(data, center, h, w, radius_max):
     aver = np.zeros(radius_max)
-    aver[0] = data[index[0],index[1]]
+    aver[0] = data[center[1], center[0]]
     for r in range(1,radius_max):
         mask = create_circular_mask(h,w, center = center, radius = r)
         aver[r] = np.sum(mask*data)/(mask > 0).sum()
     return aver
 
 ## Plots the average intensity at radius r. Center is the center of the dense core, h = height of data, w = width of data, radius_max is the total size of the circle.
-def plot_intensity2radius(aver, center, h, w, radius_max):   
+def plot_intensity2radius(data, center, h, w, radius_max):   
     aver = check_circular(data, center, h, w, radius_max)
     plt.plot(range(len(aver)), aver)
     plt.show()
@@ -128,3 +83,35 @@ def plot_intensity2radius(aver, center, h, w, radius_max):
     y_low = 725*5
     y_high = 755*5
 '''
+
+def find_artefacts(data, y_low, y_high, x_low, x_high, radius_max=40):
+    data_slice = data[y_low:y_high, x_low:x_high]
+    #print(index)
+    maxim = data_slice.argmax()
+    index = np.unravel_index(maxim, data_slice.shape)
+    h = y_high - y_low   
+    w = x_high - x_low
+    center = (index[1], index[0])
+    plotting.plot_figure(data_slice,"Artefakt")
+    plot_intensity2radius(data_slice, center, h, w, radius_max)
+
+
+
+"Test"
+
+file_path = "C:/Users/Tage/Programmering/AoP80/Q1-latest-whigal-85.fits"
+x_low = 15470*5
+x_high = 15495*5
+y_low = 575*5
+y_high = 595*5
+data = get_data.get_data_slice(file_path, 0, 10000, 0, 80000)
+
+find_artefacts(data, y_low, y_high, x_low, x_high)
+
+
+
+#plt.plot(peaksh, datap[peaksh], "x")
+#plt.plot(peaksl, datap[peaksl], 'x')
+#plt.plot(X,datap)
+#plt.show()
+
