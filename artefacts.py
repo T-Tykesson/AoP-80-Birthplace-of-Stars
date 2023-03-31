@@ -54,7 +54,7 @@ minimum_peak_diff = 15
 strictness = 1
 
 full_data = False #Ändra till false om man inte vill dela upp hela datan
-file_path = "C:/Users/joaki/Pictures/Q1-latest-whigal-85.fits"
+file_path = "Q1-latest-whigal-85.fits"
 
 if full_data:
     data_list = []
@@ -78,7 +78,7 @@ else:
 
 maxim = data.argmax()
 index = np.unravel_index(maxim, data.shape)
-print(index)
+#print(index)
 plotting.plot_figure(data,"Artefakt")
 
 size = 40
@@ -86,19 +86,20 @@ size = 40
 datap = data[index[0], (index[1]-size):(index[1]+size)]
 X = np.linspace(0,2*size-1, num=2*size)
 
-peaksh, valuehigh = find_peaks(datap) #List of local maxima
-peaksl, valuelow = find_peaks(-datap) #List of local minima
-print(valuehigh)
+peaksh, _ = find_peaks(datap) #List of local maxima
+peaksl, _ = find_peaks(-datap) #List of local minima
+
 
 print(size-peaksl)
 print(size-peaksh)
 print(check_for_symmetry((size-peaksh), (size-peaksl), strictness))
 
-plt.plot(peaksh, datap[peaksh], "x")
-plt.plot(peaksl, datap[peaksl], 'x')
-plt.plot(X,datap)
-plt.show()
+#plt.plot(peaksh, datap[peaksh], "x")
+#plt.plot(peaksl, datap[peaksl], 'x')
+#plt.plot(X,datap)
+#plt.show()
 
+## Creates a ring with radius=radius with center at center. h = height of data and w = width of data
 def create_circular_mask(h, w, center=None, radius=None):
     if center is None: # use the middle of the image
         center = (int(w/2), int(h/2))
@@ -113,22 +114,20 @@ def create_circular_mask(h, w, center=None, radius=None):
     mask = masko^maski
     return mask
 
-h = y_high - y_low   
-w = x_high - x_low
-center = (index[1], index[0])
-
-def check_circular(data, radius_max):
+## Takes the average intensity of the ring at radius r. Center is the center of the dense core, h = height of data and w = width of data, radius_max is the total size of the circle.
+def check_circular(data, center, h, w, radius_max):
     aver = np.zeros(radius_max)
+    aver[0] = data[index[0],index[1]]
     for r in range(1,radius_max):
         mask = create_circular_mask(h,w, center = center, radius = r)
-        aver[r] = np.mean(mask*data)
-        #plotting.plot_figure(mask*data,'test')
-    aver[0] = data[index[0],index[1]]
+        aver[r] = np.sum(mask*data)/(mask > 0).sum()
     return aver
-    
-aver = check_circular(data, 40)
-plt.plot(range(len(aver)), aver)
-plt.show()
+
+## Plots the average intensity at radius r. Center is the center of the dense core, h = height of data, w = width of data, radius_max is the total size of the circle.
+def plot_intensity2radius(aver, center, h, w, radius_max):   
+    aver = check_circular(data, center, h, w, radius_max)
+    plt.plot(range(len(aver)), aver)
+    plt.show()
 
 
 '''
