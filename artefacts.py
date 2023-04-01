@@ -51,44 +51,44 @@ def significance_of_peak(local_max, local_min, threshold): #Checks if given valu
     else:
         return False
 
-minimum_peak_diff = 15
-strictness = 1
+#minimum_peak_diff = 15
+#strictness = 1
 
-full_data = False #Ändra till false om man inte vill dela upp hela datan
-file_path = "Q1-latest-whigal-85.fits"
+#full_data = False #Ändra till false om man inte vill dela upp hela datan
+#file_path = "Q1-latest-whigal-85.fits"
 
-if full_data:
-    data_list = []
-    xslice = 10000
-    yslice = 7000
+#if full_data:
+#    data_list = []
+#    xslice = 10000
+#    yslice = 7000
 
-    with fits.open(file_path, use_fsspec=True, fsspec_kwargs={"anon": True}) as hdul:  
-       #cutout = hdul[0].section[0:1750, 0:2500] 
-        for i in tqdm(range(0, int(7000/yslice))):
-            for j in tqdm(range(0, int(120000/xslice))):
-                cutout = hdul[0].section[yslice*i:yslice*i + yslice, xslice*j:xslice*j+xslice]
-                data_list.append(cutout)
-else:
-    data = fits.getdata(file_path)
-    x_low = 11540*5
-    x_high = 11565*5
-    y_low = 636*5
-    y_high = 656*5
-    data = data[y_low:y_high, x_low:x_high]
+#    with fits.open(file_path, use_fsspec=True, fsspec_kwargs={"anon": True}) as hdul:  
+#       #cutout = hdul[0].section[0:1750, 0:2500] 
+#        for i in tqdm(range(0, int(7000/yslice))):
+#            for j in tqdm(range(0, int(120000/xslice))):
+#                cutout = hdul[0].section[yslice*i:yslice*i + yslice, xslice*j:xslice*j+xslice]
+#                data_list.append(cutout)
+#else:
+#    data = fits.getdata(file_path)
+#    x_low = 11540*5
+#    x_high = 11565*5
+#    y_low = 636*5
+#    y_high = 656*5
+#    data = data[y_low:y_high, x_low:x_high]
     
 
-maxim = data.argmax()
-index = np.unravel_index(maxim, data.shape)
+#maxim = data.argmax()
+#index = np.unravel_index(maxim, data.shape)
 #print(index)
 #plotting.plot_figure(data,"Artefakt")
 
-size = 40
+#size = 40
 
-datap = data[index[0], (index[1]-size):(index[1]+size)]
-X = np.linspace(0,2*size-1, num=2*size)
+#datap = data[index[0], (index[1]-size):(index[1]+size)]
+#X = np.linspace(0,2*size-1, num=2*size)
 
-peaksh, _ = find_peaks(datap) #List of local maxima
-peaksl, _ = find_peaks(-datap) #List of local minima
+#peaksh, _ = find_peaks(datap) #List of local maxima
+#peaksl, _ = find_peaks(-datap) #List of local minima
 
 
 #print(size-peaksl)
@@ -155,29 +155,35 @@ def find_artefacts_from_coords(data, coords, width, radius_max=40):
     #coords is y,x coordinates tuples
     for i in range(len(coords)):
         y, x = coords[i]
-        center = y, x
-        y_low = y - width
-        y_high = y + width
-        x_low = x - width
-        y_high = y + width
+        #center = y, x
+        y_low = max(y - width, 0)
+        print("ylow:", y_low)
+        y_high = min(y + width, 7000)
+        print("yhigh:", y_high)
+        x_low = max(x - width, 0)
+        x_high = min(x + width, 120000)
         h = y_high - y_low   
+        print("h:", h)
         w = x_high - x_low
+        print("w:", w)
         
+        center = (h//2, w//2)
+        print(x, y)
         data_slice = data[y_low:y_high, x_low:x_high]
-        plotting.plot_figure(data_slice,"Artefakt")
+        plotting.plot_figure(data_slice,f"Artefact? ({x},{y})")
         plot_intensity2radius(data_slice, center, h, w, radius_max)
 
 
 "Test"
 
-file_path = "Q1-latest-whigal-85.fits"
-x_low = 15470*5
-x_high = 15495*5
-y_low = 575*5
-y_high = 595*5
-data = get_data.get_data_slice(file_path, 0, 10000, 0, 80000)
+#file_path = "Q1-latest-whigal-85.fits"
+#x_low = 15470*5
+#x_high = 15495*5
+#y_low = 575*5
+#y_high = 595*5
+#data = get_data.get_data_slice(file_path, 0, 10000, 0, 80000)
 
-find_artefacts(data, y_low, y_high, x_low, x_high)
+#find_artefacts(data, y_low, y_high, x_low, x_high)
 
 #%%
 

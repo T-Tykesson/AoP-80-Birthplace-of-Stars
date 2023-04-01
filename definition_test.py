@@ -1,11 +1,15 @@
 import get_data
 import definition
+import artefacts
 from us_mask import gaussian_threshold
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import skimage
+import skimage.feature
 import numpy as np
 import wavelet
+
+#%%
 
 def imshow(data, norm_low, norm_high, cmap="hot", dpi=15, figsize=(15, 15)):
     plt.figure(figsize=figsize, dpi=dpi)
@@ -35,6 +39,13 @@ def definition_test(data, mask, length, mult, lowest_val, plots):
     imshow(pad_mask*data + g*~pad_mask*0.3, 0, 70, dpi=100)
     imshow(pad_df*data + g*~pad_df*0.3, 0, 70, dpi=100)
     imshow(pad_df*data + g*~pad_df*0.3, 0, 200, dpi=100)
+    
+    tuple_list = []
+    for i in range(len(arr[4])): #Skapar lista med koordinater
+        if arr[9][i] == True:
+            tuple_list.append((arr[4][i], arr[5][i])) 
+    
+    return df, arr, tuple_list
 
 # Get data
 data = get_data.get_data_slice("", 0, 10000, 0, 10000)
@@ -54,8 +65,16 @@ w_mask = w_sum > 100
 # Plot data
 imshow(data, 0, 70, dpi=100)
 
+
 # Test definition
-definition_test(data, binary, length, mult, lowest_val, 0)
-definition_test(data, w_mask, length, mult, lowest_val, 0)
+df, arr, tuple_list_1 = definition_test(data, binary, length, mult, lowest_val, 0)
 
+#definition_test(data, w_mask, length, mult, lowest_val, 0)
 
+#%%
+artefacts.find_artefacts_from_coords(data, tuple_list_1, 100)
+
+#%%
+
+df, arr, tuple_list_2 = definition_test(data, w_mask, length, 2, 5, 0)
+artefacts.find_artefacts_from_coords(data, tuple_list_1, 100)
