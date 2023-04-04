@@ -5,12 +5,111 @@ import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from tqdm import tqdm
 
+minimum_peak_diff = 15
+strictness = 1
+size = 40
+def check_symmetry(orgdata, centre_coords):
+    ymid = centre_coords[0]
+    xmid = centre_coords[1]
+    
+
+    datap = orgdata[xmid, (ymid-size):(ymid+size)]
+    X = np.linspace(0,2*size-1, num=2*size)
+
+    peaksh, _ = find_peaks(datap) #List of local maxima
+    peaksl, _ = find_peaks(-datap) #List of local minima
+    print(size-peaksl)
+    print(size-peaksh)
+    symmetry_y = symmetry_2d(size - peaksh, size - peaksl, strictness, datap, xmid)
+    print("Likely an artefact:")
+    print(symmetry_y)
+    plt.plot(peaksh, datap[peaksh], "x")
+    plt.plot(peaksl, datap[peaksl], 'x')
+    plt.plot(X,datap)
+    plt.show()
+    
+    datap = orgdata[ymid, (xmid-size):(xmid+size)]
+    X = np.linspace(0,2*size-1, num=2*size)
+
+    peaksh, _ = find_peaks(datap) #List of local maxima
+    peaksl, _ = find_peaks(-datap) #List of local minima
+    print(size-peaksl)
+    print(size-peaksh)
+    symmetry_y = symmetry_2d(size - peaksh, size - peaksl, strictness, datap, ymid)
+    print("Likely an artefact:")
+    print(symmetry_y)
+    plt.plot(peaksh, datap[peaksh], "x")
+    plt.plot(peaksl, datap[peaksl], 'x')
+    plt.plot(X,datap)
+    plt.show()
+    
+    
+    
+#Checks if there is symmetry in the peaks and if there is a significant difference beteween minima and maxima
+def symmetry_2d(peaksmax, peaksmin, margin_of_error, datam, c):
+    max_right = None
+    max_left = None
+    min_right = None
+    min_left = None
+    symmetry = False
+    
+    for i in range(len(peaksmax)):
+        if peaksmax[i] <= -10:
+            max_right = peaksmax[i]
+            print(max_right)
+            for j in reversed(range(i)):
+                if peaksmax[j] > 10:
+                    max_left = peaksmax[j]
+                    print(max_left)
+                    break
+            break
+        
+    
+    if  max_left == None or max_right == None:
+        print("Lacking maxima on sides")
+        return False
+    
+    for i in range(len(peaksmin)):
+        if peaksmin[i] <= -10:
+            min_right = peaksmin[i]
+            print(min_right)
+            for j in reversed(range(i)):
+                if peaksmin[j] > 10:
+                    min_left = peaksmin[j]
+                    print(min_left)
+                    break
+            break
+    
+    if  min_left == None or min_right == None:
+        print("Lacking minima on sides")
+        return False
+        
+    if absolute_symmetry(max_left, max_right, margin_of_error) and absolute_symmetry(min_left, min_right, margin_of_error):
+        if significance_of_peak(max_right , min_right, minimum_peak_diff, datam) and significance_of_peak(max_left, min_left, minimum_peak_diff, datam):
+            symmetry = True
+    else:
+            symmetry = False
+            print("Symmetryfail")
+    
+    return symmetry
+
+def significance_of_peak(local_max, local_min, threshold, datag): #Checks if given values are significantly different
+
+    if datag[local_max + size] - datag[local_min + size] > threshold:
+        return True
+    else:
+        print("significance fail")
+        return False
+    
+    
+
 def absolute_symmetry(value1, value2, margin):
     if abs(value1) == abs(value2) or abs(value1) == abs(value2) + margin or abs(value1) == abs(value2) - margin:
         return True
     else:
         return False
 
+<<<<<<< Updated upstream
 #Checks if there is symmetry in the peaks and if there is a significant difference beteween minima and maxima
 def check_for_symmetry(peaksmax, peaksmin, margin_of_error):
     center_index = None
@@ -98,6 +197,10 @@ plt.plot(peaksh, datap[peaksh], "x")
 plt.plot(peaksl, datap[peaksl], 'x')
 plt.plot(X,datap)
 plt.show()
+=======
+
+
+>>>>>>> Stashed changes
 
 def create_circular_mask(h, w, center=None, radius=None):
     if center is None: # use the middle of the image
@@ -132,18 +235,55 @@ plt.show()
 
 
 '''
-    x_low = 15470*5
-    x_high = 15495*5
-    y_low = 575*5
-    y_high = 595*5
+x_low = 15470*5
+x_high = 15495*5
+y_low = 575*5
+y_high = 595*5
 
-    x_low = 11540*5
-    x_high = 11565*5
-    y_low = 636*5
-    y_high = 656*5
+x_low = 11540*5
+x_high = 11565*5
+y_low = 636*5
+y_high = 656*5
     
-    x_low = 11840*5
-    x_high = 11875*5
-    y_low = 725*5
-    y_high = 755*5
+x_low = 11840*5
+x_high = 11875*5
+y_low = 725*5
+y_high = 755*5
 '''
+<<<<<<< Updated upstream
+=======
+
+def find_artefacts(data, y_low, y_high, x_low, x_high, radius_max=40):
+    data_slice = data[y_low:y_high, x_low:x_high]
+    #print(index)
+    maxim = data_slice.argmax()
+    index = np.unravel_index(maxim, data_slice.shape)
+    h = y_high - y_low   
+    w = x_high - x_low
+    center = (index[1], index[0])
+    plotting.plot_figure(data_slice,"Artefakt")
+    plot_intensity2radius(data_slice, center, h, w, radius_max)
+    
+    check_symmetry(data_slice, center)
+
+
+
+"Test"
+
+file_path = "C:/Users/joaki/Pictures/Q1-latest-whigal-85.fits"
+x_low = 15470*5
+x_high = 15495*5
+y_low = 575*5
+y_high = 595*5
+data = get_data.get_data_slice(file_path, 0, 10000, 0, 80000)
+
+find_artefacts(data, y_low, y_high, x_low, x_high)
+
+
+
+#plt.plot(peaksh, datap[peaksh], "x")
+#plt.plot(peaksl, datap[peaksl], 'x')
+#plt.plot(X,datap)
+#plt.show()
+
+>>>>>>> Stashed changes
