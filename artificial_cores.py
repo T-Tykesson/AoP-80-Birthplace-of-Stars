@@ -55,7 +55,7 @@ def insert_circles(data, gaussian, nr): #antar symetrisk gaussian
     #plot(data_copy, dpi=300, colorbar=True, title="test", vmin=np.mean(data)-1*np.std(data), vmax=(np.mean(data)+6*np.std(data)), cmap="inferno")   
     return data_copy, art_catalog
 
-def insert_art_cores(data_list, xslice, kernel_size=20, amount=1000):
+def insert_art_cores_data_slices(data_list, xslice, kernel_size=20, amount=1000):
     art_data_list = []
     art_catalog_list = []
     
@@ -80,6 +80,22 @@ def insert_art_cores(data_list, xslice, kernel_size=20, amount=1000):
     art_catalog_tuples = tuple(map(tuple, art_catalog_list[:,0:2]))
     
     return art_data_list, art_catalog_list, art_catalog_tuples
+
+def insert_art_cores(data, kernel_size=20, amount=1000):
+    gaussian_core = create_gaussian_filter(kernel_size)
+    h, w = gaussian_core.shape[:2]
+    circular_mask = create_circular_mask(h, w)
+    
+    art_core = gaussian_core.copy()
+    art_core[~circular_mask] = 0
+    
+    art_data, art_catalog = insert_circles(data, art_core, amount)
+    art_catalog = np.array(art_catalog)
+    #art_catalog_list.append(art_catalog)
+
+    art_catalog_tuples = list(map(tuple, art_catalog[:,0:2]))
+    
+    return art_data, art_catalog, art_catalog_tuples
 
 def test_cores(art_catalog_tuples, found_catalog_tuples): #input är tuples av koordinater
     found = []
