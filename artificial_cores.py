@@ -97,7 +97,7 @@ def insert_art_cores(data, kernel_size=20, amount=1000):
     
     return art_data, art_catalog, art_catalog_tuples
 
-def test_cores(art_catalog_tuples, found_catalog_tuples): #input är tuples av koordinater
+def test_cores(art_catalog_tuples, found_catalog_tuples): # input är tuples av koordinater
     found = []
     for tup in art_catalog_tuples:
         if tup in found_catalog_tuples:

@@ -22,10 +22,10 @@ def create_box_around_peaks(peaks_mask, size):
     offsets = np.pad(np.array([range(-(size//2), size//2 + 1)]), ([0, len(row_pad) - 1], [0, 0]), 'edge')
     print("padded")
     row_pad = row_pad + offsets
-    row_pad = np.minimum(row_pad, (len(peaks_mask) - 1) * len(peaks_mask) // len(peaks_mask))
+    row_pad = np.minimum(row_pad, (len(peaks_mask) - 1))
     row_pad = np.maximum(row_pad, 0)
     col_pad = col_pad + offsets
-    col_pad = np.minimum(col_pad, (len(peaks_mask) - 1) * len(peaks_mask[0]) // len(peaks_mask[0]))
+    col_pad = np.minimum(col_pad, (len(peaks_mask[0]) - 1))
     col_pad = np.maximum(col_pad, 0)
     print("Set offsets")
     expanded_rows = np.expand_dims(row_pad, axis=2)
@@ -60,7 +60,6 @@ def test_def(data, peaks_mask, length, mult, lowest_val, remove_len=None):
     stds, means, lengths = get_std_from_matrices(matrices, remove_len)
 
     filtered_by_def = np.bitwise_and(peak_values - means > stds * mult, peak_values - means > lowest_val)
-    print("SUM FBD:", np.sum(filtered_by_def))
     peaks_mask[peak_rows, peak_cols] = filtered_by_def
     
     # def_rows, def_cols = np.where(peaks_mask)
@@ -125,7 +124,6 @@ def get_std_from_matrices(matrices, remove_size=None, max_diff=0.1, step=6 ):
 
             std_list[std_diff_check] = std_from_sub_lists[std_diff_check]
             mean_list[std_diff_check] = np.mean(sub_lists[std_diff_check], axis=1)
-            print(std_list[std_diff_check])
             length_list[std_diff_check] = i
 
             if np.sum(std_list != 0) == len(std_list):
@@ -135,7 +133,7 @@ def get_std_from_matrices(matrices, remove_size=None, max_diff=0.1, step=6 ):
         sub_lists = remove_centre_from_matrices(matrices, remove_size)
         std_list = np.std(sub_lists, axis=1)
         mean_list = np.mean(sub_lists, axis=1)
-        length_list = np.array([remove_len]*len(matrices))
+        length_list = np.array([remove_size]*len(matrices))
         
     if (np.sum(std_list == 0) > 0):
         print(str(np.sum(std_list == 0)) + " of " + str(len(std_list)) + " matrices didn't get a converging standard deviation.")
