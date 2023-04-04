@@ -6,6 +6,7 @@ import numpy as np
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator
 from sys import exit
+import plotting
 
 # Returns the indexes of the squares (with a given length) around the 1:s in the mask.
 def get_matrices_from_mask(data, mask, length):
@@ -93,30 +94,28 @@ def get_sub_lists_from_matrices(matrices, remove_len):
 # or the standard deviations where the center is removed by a given length.
 def get_std_from_matrices(matrices, remove_len=None):
     
-    max_diff = 0.1
+    max_diff = 0.01
     length = len(matrices[0])
-    std_list = np.array([0]*len(matrices))
-    mean_list = np.array([0]*len(matrices))
-    length_list = np.array([0]*len(matrices))
-    
+    std_list = np.array([0]*len(matrices), dtype=np.float64)
+    mean_list = np.array([0]*len(matrices), dtype=np.float64)
+    length_list = np.array([0]*len(matrices), dtype=np.float64)
+    prev_std_from_sub_lists = None
     if remove_len == None:
         
         sub_lists = get_sub_lists_from_matrices(matrices, 0)
         prev_std_from_sub_lists = np.std(sub_lists, axis=1)
         
-        for i in range(7, length, 6):
+        for i in range(7, length, 2):
             print(i, " : ", end="")
             sub_lists = get_sub_lists_from_matrices(matrices, i)
             std_from_sub_lists = np.std(sub_lists, axis=1)
             std_diff = prev_std_from_sub_lists - std_from_sub_lists
             
             std_diff_check = np.bitwise_and(np.abs(std_diff) < max_diff, std_list == 0)
-            print(std_diff)
-            #print(std_diff_check)
             std_list[std_diff_check] = std_from_sub_lists[std_diff_check]
             mean_list[std_diff_check] = np.mean(sub_lists[std_diff_check], axis=1)
+            print(std_list[std_diff_check])
             length_list[std_diff_check] = i
-            #print(length_list)
             prev_std_from_sub_lists = std_from_sub_lists
             if np.sum(std_list != 0) == len(matrices):
                 break
@@ -126,37 +125,99 @@ def get_std_from_matrices(matrices, remove_len=None):
         std_list = np.std(sub_lists, axis=1)
         mean_list = np.mean(sub_lists, axis=1)
         length_list = np.array([remove_len]*len(matrices))
-        #print(length_list)
         
     if (np.sum(std_list == 0) > 0):
         print(str(np.sum(std_list == 0)) + " of " + str(len(std_list)) + " matrices didn't get a converging standard deviation.")
-        std_list[std_list == 0] = prev_std_from_sub_lists[std_list == 0]
         mean_list[std_list == 0] = np.mean(sub_lists[std_list == 0], axis=1)
         length_list[std_list == 0] = i
-        #print(i)
+        std_list[std_list == 0] = prev_std_from_sub_lists[std_list == 0]
+        print(std_list == 0)
         
     return std_list, mean_list, length_list
 
 
-# Plots graphs of given i where definition has been tested.
-def plot_def(index_arr, x_view, arr):
+# Plots graphs of given indexes where definition has been tested.
+def plot_def(index_arr, x_view, arr, realdata, lr_artefacts_arr, circ_artefacts_arr, onlyPos=False, onlyArtefacts=False, artefact_df_indexing=False):
     data, length, mult, lowest_val, def_rows, def_cols, stds, means, lengths, test = arr
+    artefacts_index = 0
     for i in index_arr:
         if i > len(def_rows) - 1:
             break
-        plt.title(str(i) + ": " + "(" + str(def_cols[i]) + ", " + str(def_rows[i]) + ") " + str(test[i]))
+        
+        if (not test[i] and onlyPos):
+            if not artefact_df_indexing:
+                artefacts_index += 1
+            continue
+        
+        if (onlyArtefacts and not (lr_artefacts_arr[artefacts_index][6] or circ_artefacts_arr[artefacts_index][6])):
+            artefacts_index += 1
+            continue
+        
+        
         x_view_left = max(def_cols[i]-x_view, 0)
         x_view_right = min(def_cols[i]+x_view+1, len(arr[0][0]))
-        plt.plot(range(-(x_view_right - x_view_left)//2, (x_view_right - x_view_left)//2), data[def_rows[i], x_view_left:x_view_right])
         
-        plt.axhline(y = data[def_rows[i], def_cols[i]], markersize=6, color="black", linewidth=2, linestyle="dashed")
-        plt.axhline(y = means[i], color="black")
-        plt.axhline(y = means[i]+lowest_val, color="r")
-        plt.axhline(y = means[i]+stds[i]*mult, color="y")
-        plt.axvline(x = -lengths[i]//2, color="black")
-        plt.axvline(x = lengths[i]//2, color="black")
+        xstart = max(def_cols[i]-x_view, 0)
+        xend = min(def_cols[i]+x_view+1, len(arr[0][0]))
+        
+        ystart = max(def_rows[i]-x_view, 0)
+        yend = min(def_rows[i]+x_view+1, len(arr[0][0]))
+        
+        fig = plt.figure(figsize=(20,20), dpi=100)
+        gs = fig.add_gridspec(2,3)
+        
+        ax = fig.add_subplot(gs[0, 0])
+        ax.imshow(realdata[ystart:yend, xstart:xend], cmap="hot", origin='lower', interpolation="none", norm=Normalize(0, np.max(realdata[ystart:yend, xstart:xend])))
+        
+        ax = fig.add_subplot(gs[0, 1:])
+        
+        ax.plot(range(-(x_view_right - x_view_left)//2, (x_view_right - x_view_left)//2), data[def_rows[i], x_view_left:x_view_right], '-')
+        
+        if not artefact_df_indexing or test[i]:
+            ax.plot(range(-(x_view_right - x_view_left)//2, (x_view_right - x_view_left)//2), lr_artefacts_arr[artefacts_index][3], '-')
+            left_index = lr_artefacts_arr[artefacts_index][4]
+            right_index = lr_artefacts_arr[artefacts_index][5]
+            
+            if left_index != None and right_index != None:
+                left_y = lr_artefacts_arr[artefacts_index][3][left_index]
+                left_x = left_index - lr_artefacts_arr[artefacts_index][2] - 1
+                
+                right_y = lr_artefacts_arr[artefacts_index][3][right_index]
+                right_x = right_index - lr_artefacts_arr[artefacts_index][2] - 1
+                
+                ax.plot(left_x, left_y, 'o', right_x, right_y, 'o')
+        
+        ax.axhline(y = data[def_rows[i], def_cols[i]], markersize=6, color="black", linewidth=2, linestyle="dashed")
+        ax.axhline(y = means[i], color="black")
+        #plt.axhline(y = means[i]+lowest_val, color="r")
+        ax.axhline(y = means[i]+stds[i]*mult, color="y")
+        ax.axhline(y = means[i]+stds[i], color="y", linestyle="dashed")
+        ax.axvline(x = -lengths[i]//2, color="black")
+        ax.axvline(x = lengths[i]//2, color="black")
 
+        ax = fig.add_subplot(gs[1, 0])
+        ax.imshow(data[ystart:yend, xstart:xend], cmap="hot", origin='lower', interpolation="none", norm=Normalize(0, 5))
+     
+        ax = fig.add_subplot(gs[1, 1])
+        ax.plot(range(-(x_view_right - x_view_left)//2, (x_view_right - x_view_left)//2), realdata[def_rows[i], x_view_left:x_view_right])
+        ax.axvline(x = -lengths[i]//2, color="black")
+        ax.axvline(x = lengths[i]//2, color="black")
+     
+        ax = fig.add_subplot(gs[1, 2])
+        
+        if not artefact_df_indexing or test[i]:
+            ax.plot(range(0, len(circ_artefacts_arr[artefacts_index][5])), circ_artefacts_arr[artefacts_index][5])
+            ax.plot(range(0, len(circ_artefacts_arr[artefacts_index][3])), circ_artefacts_arr[artefacts_index][3])
+            ax.plot(circ_artefacts_arr[artefacts_index][4], circ_artefacts_arr[artefacts_index][3][circ_artefacts_arr[artefacts_index][4]], 'o')
+            
+            fig.suptitle(str(i) + ": " + "(" + str(def_cols[i]) + ", " + str(def_rows[i]) + ") " + str(test[i]) + ", Artefact: " + str(lr_artefacts_arr[artefacts_index][6]) + " " + str(circ_artefacts_arr[artefacts_index][6]), fontsize=20)
+        else:
+            fig.suptitle(str(i) + ": " + "(" + str(def_cols[i]) + ", " + str(def_rows[i]) + ") " + str(test[i]), fontsize=20)
+        
         plt.show()
+        
+        if not artefact_df_indexing or test[i]:
+            artefacts_index += 1
 
 def plot_def_3d(index_arr, x_view, y_view, arr, dpi=100, degree=90):
     data, length, mult, lowest_val, def_rows, def_cols, stds, means, lengths, test = arr
@@ -164,7 +225,7 @@ def plot_def_3d(index_arr, x_view, y_view, arr, dpi=100, degree=90):
     for i in index_arr:
         if i > len(def_rows) - 1:
             break
-    
+        
         xstart = max(def_cols[i]-x_view, 0)
         xend = min(def_cols[i]+x_view+1, len(arr[0][0]))
         
