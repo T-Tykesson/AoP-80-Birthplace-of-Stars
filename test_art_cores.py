@@ -10,7 +10,6 @@ import definition
 import get_data
 import artificial_cores
 import plotting
-import us_mask
 from tqdm import tqdm 
 import numpy as np
 
@@ -31,8 +30,17 @@ gaussian_blur_list = []
 final_mask_list = []
 
 
+
+from skimage.filters import gaussian, unsharp_mask
+
+def gaussian_threshold(data, sigma, offset):
+    g = gaussian(data, sigma=sigma)
+    binary = data > (g + offset)
+    return g, binary
+
+
 for data in tqdm(art_data):
-    g_blur, binary = us_mask.gaussian_threshold(data, 25, 10)
+    g_blur, binary = gaussian_threshold(data, 25, 10)
     final_mask = np.full(np.shape(g_blur), False)
 
     plotting.plot(g_blur)
