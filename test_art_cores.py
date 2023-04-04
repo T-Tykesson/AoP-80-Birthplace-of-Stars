@@ -18,11 +18,16 @@ file_path = "C:/Users/Tage/Programmering/AoP80/Q1-latest-whigal-85.fits"
 xslice = 5000
 yslice = 7000
 
-data_list = get_data.get_splitted_data(file_path, yslice, xslice)
+data_list = get_data.get_data_slice(file_path, 0, yslice, 0, xslice)
 #%%
 "lägger till cores i data"
-half_data = data_list[0:3]
-art_data, art_cores, art_tuples = artificial_cores.insert_art_cores(half_data, xslice*8, amount=2000)
+#half_data = data_list[0:3]
+art_data, art_cores, art_tuples = artificial_cores.insert_art_cores(data_list, amount=20)
+
+plotting.plot(art_data, vmin= np.mean(art_data) - 2*np.std(art_data), vmax= np.mean(art_data) + 2*np.std(art_data), cmap="inferno")
+
+art_data, art_artefacts, art_tuples = artificial_cores.insert_art_artefacts(art_data, amount=100)
+plotting.plot(art_data, vmin= np.mean(art_data) - 2*np.std(art_data), vmax= np.mean(art_data) + 2*np.std(art_data), cmap="inferno")
 #%%
 "här lägger man in metod + definition som ger mask"
 binary_mask_list = []
