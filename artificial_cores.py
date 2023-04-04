@@ -37,7 +37,7 @@ def create_circular_mask(h, w, center=None, radius=None):
     return mask
 
 "Insert circles into data"
-def insert_circles(data, gaussian, nr): #antar symetrisk gaussian
+def insert_circles(data, gaussian, nr, intensity="Random", int_min=50, int_max=350): #antar symetrisk gaussian
     size = len(gaussian)
     art_catalog = []
     data_copy = np.array(data, copy=True)
@@ -45,17 +45,20 @@ def insert_circles(data, gaussian, nr): #antar symetrisk gaussian
         xrandom = np.random.randint(0, high=len(data[1])-len(gaussian)) #ändra 
         yrandom = np.random.randint(0, high=len(data)-len(gaussian))
         
-        intensity = np.random.randint(50, 350)
+        if intensity == "Random":
+            inten = np.random.randint(int_min, int_max)
+        else: 
+            inten = intensity
+            
+        art_catalog.append([int(yrandom+size/2), int(xrandom+size/2), inten]) #want to get middle of point
         
-        art_catalog.append([int(yrandom+size/2), int(xrandom+size/2), intensity]) #want to get middle of point
-        
-        data_copy[yrandom:yrandom+size,xrandom:xrandom+size] += intensity*gaussian
+        data_copy[yrandom:yrandom+size,xrandom:xrandom+size] += inten*gaussian
     
     #plot(data, dpi=300, colorbar=True, title="test", vmin=np.mean(data)-1*np.std(data), vmax=(np.mean(data)+6*np.std(data)), cmap="inferno")     
     #plot(data_copy, dpi=300, colorbar=True, title="test", vmin=np.mean(data)-1*np.std(data), vmax=(np.mean(data)+6*np.std(data)), cmap="inferno")   
     return data_copy, art_catalog
 
-def insert_art_cores_data_slices(data_list, xslice, kernel_size=20, amount=1000):
+def insert_art_cores_data_slices(data_list, xslice, kernel_size=20, amount=1000, intensity="Random", int_min=50, int_max=350):
     art_data_list = []
     art_catalog_list = []
     
@@ -81,7 +84,7 @@ def insert_art_cores_data_slices(data_list, xslice, kernel_size=20, amount=1000)
     
     return art_data_list, art_catalog_list, art_catalog_tuples
 
-def insert_art_cores(data, kernel_size=20, amount=1000):
+def insert_art_cores(data, kernel_size=20, amount=1000, intensity="Random", int_min=50, int_max=350):
     gaussian_core = create_gaussian_filter(kernel_size)
     h, w = gaussian_core.shape[:2]
     circular_mask = create_circular_mask(h, w)
@@ -105,3 +108,25 @@ def test_cores(art_catalog_tuples, found_catalog_tuples): # input är tuples av 
             
     percentage = len(found)/len(art_catalog_tuples)
     return found, percentage
+
+
+def create_art_artefacts(kernel_size = 51, brightness = 0.01): #artefacter är 50 stora ish
+    a = 0.40
+    x1 = np.linspace(-kernel_size//2, (kernel_size)//2, kernel_size-1)
+    x2 = np.linspace(-kernel_size//2, (kernel_size)//2, kernel_size-1)
+    sinc2d = np.outer(np.sin(a*x1), np.sin(a*x2)) / np.outer(brightness* x1, brightness*x2)
+    return sinc2d
+
+def insert_art_artefacts(data, amount, brightness = 1, intensity="Random", int_min=50, int_max=350):
+    sinc2d = create_art_artefacts(brightness=brightness)
+    h, w = sinc2d.shape[:2]
+    circular_mask = create_circular_mask(h, w)
+    
+    art_artefact = sinc2d.copy()
+    art_artefact[~circular_mask] = 0
+    art_data, art_catalog = insert_circles(data, art_artefact, amount)
+    art_catalog = np.array(art_catalog)
+
+    art_catalog_tuples = list(map(tuple, art_catalog[:,0:2]))
+    
+    return art_data, art_catalog, art_catalog_tuples
