@@ -113,44 +113,7 @@ def absolute_symmetry(value1, value2, margin):
         return False
 
 
-#Checks if there is symmetry in the peaks and if there is a significant difference beteween minima and maxima
-def check_for_symmetry(peaksmax, peaksmin, margin_of_error):
-    center_index = None
-    min_start1 = 0
-    min_start2 = 1
-    symmetry = False
-    
-    for i in range(len(peaksmax)):
-        if peaksmax[i] == 0:
-            center_index = i
-            max_left = i-1
-            max_right = i + 1
-    
-    if center_index == None:
-        print("Center index = null")
-        return False
-    elif  max_left < 0 or max_right > len(peaksmax):
-        print("Lacking minima or maxima on sides")
-    
-    for i in range(len(peaksmin)):
-        if peaksmin[i] > 0 and peaksmin[min_start2] < 0:
-            min_start1 = i
-            break
-        min_start2 += 1
-        
-    if absolute_symmetry(peaksmax[max_left], peaksmax[max_right], margin_of_error) and absolute_symmetry(peaksmin[min_start1], peaksmin[min_start2], margin_of_error):
-        if significance_of_peak(peaksmax[max_left], min_start1, minimum_peak_diff) and significance_of_peak(peaksmax[max_right] , min_start2, minimum_peak_diff):
-            symmetry = True
-    else:
-            symmetry = False
-    
-    return symmetry
 
-def significance_of_peak(local_max, local_min, threshold): #Checks if given values are significantly different
-    if datap[local_max] - datap[local_min] > threshold:
-        return True
-    else:
-        return False
 
 #minimum_peak_diff = 15
 #strictness = 1
@@ -200,12 +163,6 @@ def significance_of_peak(local_max, local_min, threshold): #Checks if given valu
 #plt.plot(peaksl, datap[peaksl], 'x')
 #plt.plot(X,datap)
 #plt.show()
-
-
-plt.plot(peaksh, datap[peaksh], "x")
-plt.plot(peaksl, datap[peaksl], 'x')
-plt.plot(X,datap)
-plt.show()
 
 
 ## Creates a ring with radius=radius with center at center. h = height of data and w = width of data
