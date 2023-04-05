@@ -17,21 +17,22 @@ def create_box_around_peaks(peaks_mask, size):
     rows, cols = np.where(peaks_mask == True)
     rows = np.expand_dims(rows, axis=1)
     cols = np.expand_dims(cols, axis=1)
+
     row_pad = np.pad(rows, ([0, 0], [size - 1, 0]), 'edge')
     col_pad = np.pad(cols, ([0, 0], [size - 1, 0]), 'edge')
     offsets = np.pad(np.array([range(-(size//2), size//2 + 1)]), ([0, len(row_pad) - 1], [0, 0]), 'edge')
-    print("padded")
+
     row_pad = row_pad + offsets
     row_pad = np.minimum(row_pad, (len(peaks_mask) - 1))
     row_pad = np.maximum(row_pad, 0)
+
     col_pad = col_pad + offsets
     col_pad = np.minimum(col_pad, (len(peaks_mask[0]) - 1))
     col_pad = np.maximum(col_pad, 0)
-    print("Set offsets")
+
     expanded_rows = np.expand_dims(row_pad, axis=2)
-    print("expanded rows")
     expanded_cols = np.pad(np.expand_dims(col_pad, axis=1), ([0,0],[0,size - 1],[0,0]), 'edge')
-    print("expanded cols")
+
     return expanded_rows, expanded_cols
 
 # Returns a mask, based on a given mask of peaks, where at every 1, the corresponding pixel 
@@ -69,35 +70,29 @@ def test_def(data, peaks_mask, length, mult, lowest_val, remove_len=None):
 
 # Returns a mask where there is a square with a given length at every 1 in a given mask.
 def pad_mask(mask, length):
-    print("Pad mask started.")
     if (np.sum(mask) == 0):
         print("Mask is blank")
         return mask
     mask = mask.copy()
     
     mat_rows, mat_cols = create_box_around_peaks(mask, length)
-    print("got matrices")
     mask[mat_rows, mat_cols] = True
-    print("pad mask done")
     return mask
 
 # Returns sublists of flattened matrices where the center square of a given size (len x len) is removed. 
-def remove_centre_from_matrices(matrices, remove_len):
+def remove_centre_from_matrices_and_flatten(matrices: np.ndarray, remove_len: int):
+    if matrices.shape[2] % 2 != remove_len % 2:
+        raise ValueError("Matrix width/height and remove_len must have matching parity.")
     
-    flattened_values = list(matrices.reshape(len(matrices), len(matrices[0])*len(matrices[0][0])))
+    flattened_values = matrices.reshape(len(matrices), len(matrices[0])*len(matrices[0][0]))
 
-    if remove_len == 0: return np.array(flattened_values)
+    if remove_len == 0: return flattened_values
 
-    for i, matrix in enumerate(flattened_values):
-        x = matrix[0 : (matrix.size - remove_len) // 2 + 1] + matrix[(matrix.size + remove_len) // 2 : ]
-        flattened_values[i] = np.concatenate((matrix[0: (matrix.size - remove_len) // 2 + 1], matrix[(matrix.size + remove_len) // 2 : ]))
-        # mask_matrix = np.zeros((remove_len, remove_len), dtype=bool)    
-        # mask_matrix = np.pad([[False]], [remove_len - 1, 0], 'edge')
-        # mask_matrix = np.pad(mask_matrix, pad_width=(matrices[0].size - remove_len) // 2, mode="constant", constant_values=True)
-
-    # mask_list = mask_matrix.reshape(len(mask_matrix)*len(mask_matrix[0]))
-    return np.array(flattened_values)
-    # return flattened_indexes[:, mask_list]
+    mask_matrix = np.zeros((remove_len, remove_len), dtype=bool)
+    mask_matrix = np.pad(mask_matrix, pad_width=((matrices[0].shape[0] - remove_len) // 2), mode="constant", constant_values=True)
+    
+    mask_flattened = mask_matrix.reshape(len(mask_matrix)*len(mask_matrix[0]))
+    return flattened_values[:, mask_flattened]
 
 # Returns the converging standard deviations of a list of matrices by removing an expanding portion from the center of the matrices until a defined difference limit is reached,
 # or the standard deviations where the center is removed by a given size.
@@ -110,11 +105,11 @@ def get_std_from_matrices(matrices, remove_size=None, max_diff=0.1, step=6 ):
     
     if remove_size == None:
         
-        sub_lists = remove_centre_from_matrices(matrices, remove_len=0)
+        sub_lists = remove_centre_from_matrices_and_flatten(matrices, remove_len=0)
         prev_std_from_sub_lists = np.std(sub_lists, axis=1)
         
         for i in range(0, max_remove_size, step):
-            sub_lists = remove_centre_from_matrices(matrices, remove_len=i)
+            sub_lists = remove_centre_from_matrices_and_flatten(matrices, remove_len=i)
             std_from_sub_lists = np.std(sub_lists, axis=1)
             std_diff = prev_std_from_sub_lists - std_from_sub_lists
             
@@ -130,7 +125,7 @@ def get_std_from_matrices(matrices, remove_size=None, max_diff=0.1, step=6 ):
                 break
             
     else:
-        sub_lists = remove_centre_from_matrices(matrices, remove_size)
+        sub_lists = remove_centre_from_matrices_and_flatten(matrices, remove_size)
         std_list = np.std(sub_lists, axis=1)
         mean_list = np.mean(sub_lists, axis=1)
         length_list = np.array([remove_size]*len(matrices))
