@@ -42,6 +42,7 @@ def insert_circles(data, gaussian, nr, intensity="Random", int_min=50, int_max=3
     art_catalog = []
     data_copy = np.array(data, copy=True)
     for i in range(nr):
+        
         xrandom = np.random.randint(0, high=len(data[1])-len(gaussian)) #ändra 
         yrandom = np.random.randint(0, high=len(data)-len(gaussian))
         

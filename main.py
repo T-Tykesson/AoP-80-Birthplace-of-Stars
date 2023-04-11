@@ -120,27 +120,7 @@ class Classifier:
     
     
     def unsharp_mask_fft(img, lo_threshold_percentage=0.02):
-        
-        fourier2d = scifft.fft2(img)
-
-        # plot_general(fourier2d, dpi=300, colorbar=True, cmap="hot", title="Test plot Fourier 1", scale=20)
-
-        plt.title("Fourier Transform")
-        plot_spectrum(fourier2d)
-
-        fouriercopy = fourier2d.copy()
-        row, column = fourier2d.shape
-        fouriercopy[int(row*lo_threshold_percentage):int(row*(1-lo_threshold_percentage))] = 0
-        fouriercopy[:, int(column*lo_threshold_percentage):int(column*(1-lo_threshold_percentage))] = 0
-
-        plt.figure()
-        plot_spectrum(fouriercopy)
-        plt.title("Low Filtered Fourier Transform")
-
-        fourierfiltered = scifft.ifft2(fouriercopy).real
-
-        plot_general(fourierfiltered, dpi=300, colorbar=True, cmap="hot", title="Reconstructed image", scale=20)
-
+        ...
 
     # Insert artificial cores to be detected, saving their positions
     def insert_artificial_cores(self, kernel_size=10, amount=1333):
@@ -153,19 +133,22 @@ class Classifier:
         ...
 
 
-    def run(self, insert_artificial_cores=False): 
+    def run(self, insert_artificial_cores=True): 
 
         # Definition parameters
-        length = 91  # Size of box to expand around peaks when checking against the definition of a d.c.
+        length = 131  # Size of box to expand around peaks when checking against the definition of a d.c.
         mult = 3  # Factor that peak has to exceed surrounding standard deviation
         lowest_peak_height = 1  # Minimum above surrounding mean value
-        check_bbox_size = 11  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
+        check_bbox_size = 3  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
         wavlet_levels = 3  # Number of levels to run wavelet
         wavelet_absolute_threshold = 1  # Aboslute mimimum of the summed wavlet peaks
-        min_dist_between_peaks = 2 # Minimum number of pixels required between each peak
+        min_dist_between_peaks = 1  # Minimum number of pixels required between each peak
+        visual_padding = 31  # Padding around indetified peaks to be shown when plotting
+        artificial_cores = 1100  # Number of artificial cores to insert
+        artificial_kernel_size = 15
 
         if insert_artificial_cores:
-            self.insert_artificial_cores()
+            self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size)
 
         for i, slice in enumerate(tqdm(self.cutouts)):
 
@@ -189,24 +172,32 @@ class Classifier:
             
             # Test against definition
             dense_cores_mask = definition.test_def(slice, peaks_mask, length, mult, lowest_peak_height)
-            padded_dense_cores_mask = definition.pad_mask(dense_cores_mask, 31)
+            padded_dense_cores_mask = definition.pad_mask(dense_cores_mask, visual_padding)
             
             dense_cores_values = slice[dense_cores_mask]
             dense_cores_coordinates = list(zip(*np.where(dense_cores_mask == True)[::-1]))
             print("Dense cores identified:", len(dense_cores_coordinates))
             
             if insert_artificial_cores:
-                print("CHecking found cores versus inserted cores.")
-                nfound = 0
+                print("Checking found cores versus inserted cores.")
+                num_found = 0
                 for c in self.art_cores_coords[i][:, :2]:
-
+                    
                     if tuple(c)[::-1] in dense_cores_coordinates:
-                        nfound += 1
+                        num_found += 1
+                    else:
+                        distances = np.linalg.norm(dense_cores_coordinates-c[::-1], axis=1)
+                        min_index = np.argmin(distances)
+                        if distances[min_index] < artificial_kernel_size // 3:
+                            num_found += 1
                 
-                print(f"Found {nfound}/{len(self.art_cores_coords[i])} inserted cores.")
+                print(f"Found {num_found}/{len(self.art_cores_coords[i])} inserted cores. ({num_found/len(self.art_cores_coords[i])}%)")
+                nl = "\n"
+                print(f"Did not find the following artificial cores:{nl.join(str(c) for c in self.art_cores_coords[i])}")
 
-            padded_dense_cores = np.where(padded_dense_cores_mask, slice, 0)
-            plot_general(padded_dense_cores)
+            padded_dense_cores = np.where(padded_dense_cores_mask, slice, slice*0.5)
+            # plot_general((slice, padded_dense_cores, np.where(definition.pad_mask(not_found_mask, visual_padding), slice, 0)), title="Original, Found, Not found")
+            plot_general((slice, padded_dense_cores), title="Original, Found")
 
             """
             # Lowpass Example
@@ -228,8 +219,8 @@ if __name__ == "__main__":
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 117_000, 119_000
-    Y_LOWER, Y_UPPER = 5_500, 6_500
+    X_LOWER, X_UPPER = 110_500, 112_500
+    Y_LOWER, Y_UPPER = 0, 1_500
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
-    sc.run()
+    sc.run(insert_artificial_cores=True)
