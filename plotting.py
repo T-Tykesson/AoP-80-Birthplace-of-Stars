@@ -56,29 +56,6 @@ def plot(function, dpi=100, fig_size=(30,13), title = None, norm=None, vmin=None
         plt.colorbar(im, cax=cax)
         
     plt.show()
-    
-def blob_plot(blob_log_list, data, ylow, yhigh, xlow, xhigh, dpi=100, cmap="inferno"):
-    title="laplacian of gaussian"
-    
-    fig, ax = plt.subplots(figsize=(90, 30), sharex=True, sharey=True, dpi=dpi)
-    ax.set_title(title)
-    ax.imshow(data, cmap=cmap, origin="lower", vmin=(np.mean(data)-1*np.std(data)), vmax=(np.mean(data)+4*np.std(data)))
-    #ax.imshow(final_mask, origin="lower", norm=Normalize(0, 1))
-    
-    for blob in tqdm(blob_log_list):
-        y, x, r = blob
-        c = plt.Circle((x, y), 2*r, color="red", linewidth=2, fill=False)
-        ax.add_patch(c)
-        
-    print("Rendering...")
-    ax.set_axis_off()
-     
-    plt.ylim(ylow, yhigh)
-    plt.xlim(xlow, xhigh)
-    plt.tight_layout()
-    plt.show()
-    print("Done")
-
             
 def blob_plot_multiple(detection_list, data_list, ylow, yhigh, xlow, xhigh, dpi=100, cmap="inferno"):
     k = 0
@@ -124,22 +101,3 @@ def plot_figure(func, title, norm=None, dpi=None):
     plt.colorbar(im, cax=cax)
     plt.show()
 
-def plot_image(func, title, save=False, dpi=None):
-    plt.figure()
-    plt.axis('off')
-    
-    if dpi:
-        plt.rcParams['figure.dpi'] = dpi
-    ax = plt.gca()
-    im = ax.imshow(func, norm=colors.PowerNorm(gamma=0.5), cmap='gnuplot')
-    
-    
-    if save:
-        plt.savefig(f"{title}.png", dpi=300, bbox_inches=0)
-    plt.show()
-
-def plot_spectrum(im_fft):
-    # A logarithmic colormap
-    plt.imshow(np.abs(im_fft), norm=colors.LogNorm(vmin=5))
-    plt.colorbar()
-    
