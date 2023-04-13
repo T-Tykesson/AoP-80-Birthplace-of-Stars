@@ -37,7 +37,7 @@ def create_box_around_peaks(peaks_mask, size):
 
 # Returns a mask, based on a given mask of peaks, where at every 1, the corresponding pixel 
 # in the data satisifies the given definition.
-def test_def(data, peaks_mask, length, mult, lowest_val, remove_len=None):
+def test_def(data, peaks_mask, length, mult, lowest_val, remove_len=None, max_diff=0.1, step=6):
     
     s = np.sum(peaks_mask)
     if (s == 0):
@@ -58,7 +58,7 @@ def test_def(data, peaks_mask, length, mult, lowest_val, remove_len=None):
 
     matrices = data[expanded_matrices_rows, expanded_matrices_cols]
 
-    stds, means, lengths = get_std_from_matrices(matrices, remove_len)
+    stds, means, lengths = get_std_from_matrices(matrices, remove_len, max_diff=max_diff, step=step)
 
     filtered_by_def = np.bitwise_and(peak_values - means > stds * mult, peak_values - means > lowest_val)
     peaks_mask[peak_rows, peak_cols] = filtered_by_def
@@ -66,7 +66,7 @@ def test_def(data, peaks_mask, length, mult, lowest_val, remove_len=None):
     # def_rows, def_cols = np.where(peaks_mask)
     # print("Test on definition done. From " + str(s) + " to " + str(np.sum(peaks_mask)) + " pixels.")
     # mask[rows,cols] = values > stds * mult
-    return peaks_mask # peaks_mask
+    return peaks_mask, [peak_rows, peak_cols, filtered_by_def, stds, means, lengths] # peaks_mask
 
 # Returns a mask where there is a square with a given length at every 1 in a given mask.
 def pad_mask(mask, length):
@@ -108,7 +108,7 @@ def get_std_from_matrices(matrices, remove_size=None, max_diff=0.1, step=6 ):
         sub_lists = remove_centre_from_matrices_and_flatten(matrices, remove_len=0)
         prev_std_from_sub_lists = np.std(sub_lists, axis=1)
         
-        for i in range(0, max_remove_size, step):
+        for i in range(step + 1, max_remove_size, step):
             sub_lists = remove_centre_from_matrices_and_flatten(matrices, remove_len=i)
             std_from_sub_lists = np.std(sub_lists, axis=1)
             std_diff = prev_std_from_sub_lists - std_from_sub_lists

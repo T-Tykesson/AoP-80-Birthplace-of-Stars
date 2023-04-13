@@ -3,6 +3,7 @@ import skimage
 
 from plotting import *
 import definition
+import artefacts
 import artificial_cores
 
 from astropy.io import fits
@@ -133,7 +134,7 @@ class Classifier:
         ...
 
 
-    def run(self, insert_artificial_cores=True): 
+    def run(self, unsharp_mask, wavelet, insert_artificial_cores=True): 
 
         # Definition parameters
         length = 131  # Size of box to expand around peaks when checking against the definition of a d.c.
@@ -141,64 +142,94 @@ class Classifier:
         lowest_peak_height = 1  # Minimum above surrounding mean value
         check_bbox_size = 3  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
         wavlet_levels = 3  # Number of levels to run wavelet
-        wavelet_absolute_threshold = 1  # Aboslute mimimum of the summed wavlet peaks
+        wavelet_absolute_threshold = 10  # Aboslute mimimum of the summed wavlet peaks
         min_dist_between_peaks = 1  # Minimum number of pixels required between each peak
         visual_padding = 31  # Padding around indetified peaks to be shown when plotting
         artificial_cores = 1100  # Number of artificial cores to insert
         artificial_kernel_size = 15
-
+        unsh_mask_absolute_threshold = 5  # Aboslute mimimum of the unsharp mask
+        unsh_mask_sigma = 1 # Sigma of unsharp mask
+        
+        
+        
         if insert_artificial_cores:
             self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size)
 
         for i, slice in enumerate(tqdm(self.cutouts)):
-
+            
+            plot(slice, cmap="hot", norm=colors.Normalize(0, 70))
+            
             # Full pipeline using wavelet
             # (Unsharp mask > Thresholding)
             # Wavelet > Defentition check > List of cores
-
-            smoothed = gaussian(slice, sigma=1)
-            # Run a 'haar' wavelet function over the data
-            w = Classifier.discrete_2d_wavelet(slice, wavlet_levels)
-            w_sums = w[1][0] + w[1][1] + w[1][2]  # Sum the horizontal, vertical, and diagonal return values
-
-            # Resize summed wavelet and calculate mask
-            w_sums = skimage.transform.resize(w_sums, slice.shape)
-            w_mask = w_sums > wavelet_absolute_threshold
-
-            # Create a mask of only the peaks
-            local_maxes = skimage.feature.peak_local_max(slice, min_distance=min_dist_between_peaks, labels = definition.pad_mask(w_mask, check_bbox_size))
-            peaks_mask = np.zeros(slice.shape, dtype=bool)
-            peaks_mask[local_maxes[:, 0], local_maxes[:, 1]] = True
             
-            # Test against definition
-            dense_cores_mask = definition.test_def(slice, peaks_mask, length, mult, lowest_peak_height)
-            padded_dense_cores_mask = definition.pad_mask(dense_cores_mask, visual_padding)
+            processed_data = []
+            masks = []
             
-            dense_cores_values = slice[dense_cores_mask]
-            dense_cores_coordinates = list(zip(*np.where(dense_cores_mask == True)[::-1]))
-            print("Dense cores identified:", len(dense_cores_coordinates))
-            
-            if insert_artificial_cores:
-                print("Checking found cores versus inserted cores.")
-                num_found = 0
-                for c in self.art_cores_coords[i][:, :2]:
-                    
-                    if tuple(c)[::-1] in dense_cores_coordinates:
-                        num_found += 1
-                    else:
-                        distances = np.linalg.norm(dense_cores_coordinates-c[::-1], axis=1)
-                        min_index = np.argmin(distances)
-                        if distances[min_index] < artificial_kernel_size // 3:
-                            num_found += 1
+            if unsharp_mask:
+                unsh = (slice - gaussian(slice, sigma=unsh_mask_sigma))
+                unsh_mask = unsh > unsh_mask_absolute_threshold
+                processed_data.append(unsh)
+                masks.append(unsh_mask)
                 
-                print(f"Found {num_found}/{len(self.art_cores_coords[i])} inserted cores. ({num_found/len(self.art_cores_coords[i])}%)")
-                nl = "\n"
-                print(f"Did not find the following artificial cores:{nl.join(str(c) for c in self.art_cores_coords[i])}")
-
-            padded_dense_cores = np.where(padded_dense_cores_mask, slice, slice*0.5)
-            # plot_general((slice, padded_dense_cores, np.where(definition.pad_mask(not_found_mask, visual_padding), slice, 0)), title="Original, Found, Not found")
-            plot_general((slice, padded_dense_cores), title="Original, Found")
-
+            if wavelet:
+                # Run a 'haar' wavelet function over the data
+                w = Classifier.discrete_2d_wavelet(slice, wavlet_levels)
+                w_sums = w[1][0] + w[1][1] + w[1][2]  # Sum the horizontal, vertical, and diagonal return values
+    
+                # Resize summed wavelet and calculate mask
+                w_sums = skimage.transform.resize(w_sums, slice.shape)
+                w_mask = w_sums > wavelet_absolute_threshold
+                processed_data.append(w_sums)
+                masks.append(w_mask)
+                
+            
+            for j in range(len(processed_data)):
+                # Create a mask of only the peaks
+                local_maxes = skimage.feature.peak_local_max(processed_data[j], min_distance=min_dist_between_peaks, labels = definition.pad_mask(masks[j], check_bbox_size))
+                peaks_mask = np.zeros(processed_data[j].shape, dtype=bool)
+                peaks_mask[local_maxes[:, 0], local_maxes[:, 1]] = True
+                
+                # Test against definition
+                dense_cores_mask, def_plot_arr = definition.test_def(processed_data[j], peaks_mask, length, mult, lowest_peak_height, step=2, max_diff=0.005)
+                padded_dense_cores_mask = definition.pad_mask(dense_cores_mask, visual_padding)
+                
+                # Remove artefacts
+                lr_min_mask, lr_min_plot_arr = artefacts.lr_min(processed_data[j], dense_cores_mask, 50)
+                circ_avg_min_mask, circ_avg_min_plot_arr = artefacts.circ_avg_min(processed_data[j], dense_cores_mask, 50)
+                dense_cores_mask = dense_cores_mask & np.logical_not(lr_min_mask) & np.logical_not(circ_avg_min_mask)
+                
+                dense_cores_values = processed_data[j][dense_cores_mask]
+                dense_cores_coordinates = list(zip(*np.where(dense_cores_mask == True)[::-1]))
+                print("Dense cores identified:", len(dense_cores_coordinates))
+                
+                if insert_artificial_cores:
+                    print("Checking found cores versus inserted cores.")
+                    num_found = 0
+                    for c in self.art_cores_coords[i][:, :2]:
+                        
+                        if tuple(c)[::-1] in dense_cores_coordinates:
+                            num_found += 1
+                        else:
+                            distances = np.linalg.norm(dense_cores_coordinates-c[::-1], axis=1)
+                            min_index = np.argmin(distances)
+                            if distances[min_index] < artificial_kernel_size // 3:
+                                num_found += 1
+                    
+                    print(f"Found {num_found}/{len(self.art_cores_coords[i])} inserted cores. ({num_found/len(self.art_cores_coords[i])}%)")
+                    nl = "\n"
+                    print(f"Did not find the following artificial cores:{nl.join(str(c) for c in self.art_cores_coords[i])}")
+    
+                padded_dense_cores = np.where(padded_dense_cores_mask, slice, slice*0.1)
+                # plot_general((slice, padded_dense_cores, np.where(definition.pad_mask(not_found_mask, visual_padding), slice, 0)), title="Original, Found, Not found")
+                plot_general((slice, padded_dense_cores), title="Original, Found", norm=colors.Normalize(0, 70), dpi=100)
+                
+                plot_def_and_artefacts(processed_data[j], slice, range(0, 10000), 50, length, mult, lowest_peak_height, def_plot_arr, lr_min_plot_arr, circ_avg_min_plot_arr, onlyArtefacts=True)
+                
+                #artefact_rows, artefact_cols = np.where(lr_min_mask & circ_avg_min_mask)
+                #for j in range(len(artefact_rows)):
+                #    plot(slice[(artefact_rows[j] - 25):(artefact_rows[j] + 25), (artefact_cols[j] - 25):(artefact_cols[j] + 25)], cmap="hot")
+                    
             """
             # Lowpass Example
             for r in tqdm([5, 30, 60]):
@@ -214,13 +245,13 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = "src_data/Q1-latest-whigal-85.fits"
+    src_path = ""
 
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 110_500, 112_500
-    Y_LOWER, Y_UPPER = 0, 1_500
+    X_LOWER, X_UPPER = 0_0, 10_000
+    Y_LOWER, Y_UPPER = 0, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
-    sc.run(insert_artificial_cores=True)
+    sc.run(True, False, insert_artificial_cores=False)

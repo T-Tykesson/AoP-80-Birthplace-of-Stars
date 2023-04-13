@@ -5,7 +5,7 @@ import get_data
 import matplotlib.pyplot as plt
 from scipy.signal import find_peaks
 from tqdm import tqdm
-from definition import get_matrices_from_mask
+from definition import create_box_around_peaks
 from scipy import interpolate
 
 minimum_peak_diff = 15
@@ -182,7 +182,7 @@ def create_circular_mask(h, w, center=None, radius=None):
 
 # Calculates average intensity of rings from radius 0 to given max radius at every 1 in the given mask.
 def check_circular_multiple(data, mask, radius_max):
-    matrices_coords = get_matrices_from_mask(data, mask, radius_max*2 + 1)
+    matrices_coords = create_box_around_peaks(mask, radius_max*2 + 1)
     matrices = data[matrices_coords]
     avers = np.zeros((len(matrices), radius_max))
     avers[:,0] = matrices[:, radius_max, radius_max]
@@ -200,7 +200,11 @@ def circ_avg_min(data, mask, radius_max, low=9, high=12, s=1):
     avers = check_circular_multiple(data, mask, radius_max)
     artefact_mask = np.zeros(mask.shape, dtype=bool)
     center_ys, center_xs = np.where(mask)
-    arr = []
+    
+    artefact_list = []
+    smoothed_list = []
+    smoothed_index_list = []
+    
     for i in range(len(avers)):
         center_x = center_xs[i]
         center_y = center_ys[i]
@@ -223,8 +227,13 @@ def circ_avg_min(data, mask, radius_max, low=9, high=12, s=1):
             if low <= first_right_index_smooth <= high:
                 artefact = True
                 artefact_mask[center_y, center_x] = True
-        arr.append([center_x, center_y, radius_max, ynew, first_right_index_smooth, avers[i], artefact])
-    return artefact_mask, arr
+        
+        smoothed_list.append(ynew)
+        artefact_list.append(artefact)
+        smoothed_index_list.append(first_right_index_smooth)
+        
+    
+    return artefact_mask, [center_xs, center_ys, smoothed_list, smoothed_index_list, avers, artefact_list]
 
 # Checks the first local minima to the left and right of the center point, at every 1 in the given mask.
 # If its x is between low and high it is set as an artefact.
@@ -240,7 +249,12 @@ def lr_min(data, mask, x_view, low = 8, high = 20, s=15):
     center_xs_pad = np.maximum(center_xs_pad, 0)
     center_xs_pad = np.minimum(center_xs_pad, len(data[0]) - 1)
     values_list = data[np.expand_dims(center_ys,1), center_xs_pad]
-    arr = []
+    
+    smoothed_list = []
+    first_left_index_list = []
+    first_right_index_list = []
+    artefact_list = []
+    
     for i in range(len(center_ys)):
         center_x = center_xs[i]
         center_y = center_ys[i]
@@ -265,9 +279,12 @@ def lr_min(data, mask, x_view, low = 8, high = 20, s=15):
                 artefact = True
                 artefact_mask[center_y, center_x] = True
         
-        arr.append([center_x, center_y, x_view, ynew, first_left_index, first_right_index, artefact])
+        smoothed_list.append(ynew)
+        first_left_index_list.append(first_left_index)
+        first_right_index_list.append(first_right_index)
+        artefact_list.append(artefact)
         
-    return artefact_mask, arr
+    return artefact_mask, [center_xs, center_ys, smoothed_list, first_left_index_list, first_right_index_list, artefact_list]
 
 ## Takes the average intensity of the ring at radius r. Center is the center of the dense core, h = height of data and w = width of data, radius_max is the total size of the circle.
 def check_circular(data, center, h, w, radius_max):
@@ -378,14 +395,14 @@ def find_artefacts(data, y_low, y_high, x_low, x_high, radius_max=40):
 
 "Test"
 
-file_path = ""
-x_low = 15470*5
-x_high = 15495*5
-y_low = 575*5
-y_high = 595*5
-data = get_data.get_data_slice(file_path, 0, 10000, 0, 80000)
+#file_path = ""
+#x_low = 15470*5
+#x_high = 15495*5
+#y_low = 575*5
+#y_high = 595*5
+#data = get_data.get_data_slice(file_path, 0, 10000, 0, 80000)
 
-find_artefacts(data, y_low, y_high, x_low, x_high)
+#find_artefacts(data, y_low, y_high, x_low, x_high)
 
 
 
