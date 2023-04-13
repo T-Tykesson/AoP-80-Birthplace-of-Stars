@@ -69,6 +69,7 @@ class Classifier:
         # For artifical core testing, one sublist for each cutout
         # [[[Ys], [Xs]], [[Ys], [Xs], ...]]
         self.art_cores_coords = [[]]
+        self.art_artefacts_coords = [[]]
 
 
     @plottable(fig_index=1, title="Basic unsharp masking")
@@ -127,14 +128,17 @@ class Classifier:
     def insert_artificial_cores(self, kernel_size=10, amount=1333):
         for i, cutout in enumerate(self.cutouts):
             self.cutouts[i], self.art_cores_coords[i], _ = artificial_cores.insert_art_cores(cutout, kernel_size, amount)
-
-
+            
+    def insert_artificial_artefacts(self, amount=1333):
+        for i, cutout in enumerate(self.cutouts):
+            self.cutouts[i], self.art_artefacts_coords[i], _ = artificial_cores.insert_art_artefacts(cutout, amount)     
+    
     # Get a list of coordinates of identified artefacts.
     def identify_artefacts(self) -> List[Tuple]:
         ...
 
 
-    def run(self, unsharp_mask, wavelet, insert_artificial_cores=True): 
+    def run(self, unsharp_mask, wavelet, insert_artificial_cores=True, insert_artificial_artefacts=True): 
 
         # Definition parameters
         length = 131  # Size of box to expand around peaks when checking against the definition of a d.c.
@@ -147,6 +151,7 @@ class Classifier:
         visual_padding = 31  # Padding around indetified peaks to be shown when plotting
         artificial_cores = 1100  # Number of artificial cores to insert
         artificial_kernel_size = 15
+        artificial_artefacts = 50 #Number of artificial artefacts to insert
         unsh_mask_absolute_threshold = 5  # Aboslute mimimum of the unsharp mask
         unsh_mask_sigma = 1 # Sigma of unsharp mask
         
@@ -154,6 +159,10 @@ class Classifier:
         
         if insert_artificial_cores:
             self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size)
+        
+        if insert_artificial_artefacts:
+            self.insert_artificial_artefacts(amount=artificial_artefacts)
+
 
         for i, slice in enumerate(tqdm(self.cutouts)):
             
@@ -182,7 +191,6 @@ class Classifier:
                 w_mask = w_sums > wavelet_absolute_threshold
                 processed_data.append(w_sums)
                 masks.append(w_mask)
-                
             
             for j in range(len(processed_data)):
                 # Create a mask of only the peaks
@@ -203,6 +211,9 @@ class Classifier:
                 dense_cores_coordinates = list(zip(*np.where(dense_cores_mask == True)[::-1]))
                 print("Dense cores identified:", len(dense_cores_coordinates))
                 
+                artefacts_coordinates = list(zip(*np.where(lr_min_mask & circ_avg_min_mask)[::-1]))
+                print("Artefacts identidied:", len(artefacts_coordinates))
+                
                 if insert_artificial_cores:
                     print("Checking found cores versus inserted cores.")
                     num_found = 0
@@ -219,6 +230,24 @@ class Classifier:
                     print(f"Found {num_found}/{len(self.art_cores_coords[i])} inserted cores. ({num_found/len(self.art_cores_coords[i])}%)")
                     nl = "\n"
                     print(f"Did not find the following artificial cores:{nl.join(str(c) for c in self.art_cores_coords[i])}")
+                
+                if insert_artificial_artefacts:
+                    print("Checking found cores versus inserted cores.")
+                    num_found = 0
+                    for c in self.art_artefacts_coords[i][:, :2]:
+                        
+                        if tuple(c)[::-1] in artefacts_coordinates:
+                            num_found += 1
+                        else:
+                            distances = np.linalg.norm(artefacts_coordinates-c[::-1], axis=1)
+                            min_index = np.argmin(distances)
+                            if distances[min_index] < 25: #51 size of artificial artefact
+                                num_found += 1
+                                
+                    print(f"Found {num_found}/{len(self.art_artefacts_coords[i])} inserted cores. ({num_found/len(self.art_artefacts_coords[i])}%)")
+                    nl = "\n"
+                    print(f"Did not find the following artificial artefacts:{nl.join(str(c) for c in self.art_artefacts_coords[i])}")
+    
     
                 padded_dense_cores = np.where(padded_dense_cores_mask, slice, slice*0.1)
                 # plot_general((slice, padded_dense_cores, np.where(definition.pad_mask(not_found_mask, visual_padding), slice, 0)), title="Original, Found, Not found")
@@ -250,8 +279,8 @@ if __name__ == "__main__":
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 0_0, 10_000
-    Y_LOWER, Y_UPPER = 0, 7_000
+    X_LOWER, X_UPPER = 0_0, 4_000
+    Y_LOWER, Y_UPPER = 0, 4_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
-    sc.run(True, False, insert_artificial_cores=False)
+    sc.run(True, False, insert_artificial_cores=False, insert_artificial_artefacts=False)
