@@ -311,13 +311,13 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = "C:/Users/Tage/Programmering/AoP80/Q1-latest-whigal-85.fits"
+    src_path = ""
 
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 0_0, 15_000
-    Y_LOWER, Y_UPPER = 0, 7_000
+    X_LOWER, X_UPPER = 0_0, 4_000
+    Y_LOWER, Y_UPPER = 0, 4_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
     sc.run(False, True, insert_artificial_cores=True, insert_artificial_artefacts=True)
