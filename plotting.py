@@ -56,6 +56,19 @@ def plot(function, dpi=100, fig_size=(30,13), title = None, norm=None, vmin=None
         plt.colorbar(im, cax=cax)
         
     plt.show()
+
+def scatter_plot(xs, ys, title=None, xlabel=None, ylabel=None, dpi=100, xscale='linear', yscale='linear', s=5):
+    fig, ax = plt.subplots(dpi=dpi)
+    if title != None: 
+        plt.title(f"{title}")
+    if xlabel != None:
+        ax.set_xlabel(xlabel)
+    if ylabel != None:
+        ax.set_ylabel(ylabel)
+    ax.scatter(xs, ys, s=s)
+    ax.set_yscale(xscale)
+    ax.set_xscale(yscale)
+    plt.show()
             
 def blob_plot_multiple(detection_list, data_list, ylow, yhigh, xlow, xhigh, dpi=100, cmap="inferno"):
     k = 0
