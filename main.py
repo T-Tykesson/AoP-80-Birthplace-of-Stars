@@ -20,6 +20,10 @@ from scipy.ndimage import gaussian_filter
 from typing import Tuple, List
 import pywt
 
+import time
+
+
+
 
 # Notes:
 """
@@ -125,13 +129,13 @@ class Classifier:
         ...
 
     # Insert artificial cores to be detected, saving their positions
-    def insert_artificial_cores(self, kernel_size=10, amount=1333):
+    def insert_artificial_cores(self, kernel_size=10, amount=1333, intensity="Random", int_min=50, int_max=350):
         for i, cutout in enumerate(self.cutouts):
-            self.cutouts[i], self.art_cores_coords[i], _ = artificial_cores.insert_art_cores(cutout, kernel_size, amount)
+            self.cutouts[i], self.art_cores_coords[i], _ = artificial_cores.insert_art_cores(cutout, kernel_size, amount, intensity=intensity, int_min=int_min, int_max=int_max)
             
-    def insert_artificial_artefacts(self, amount=1333):
+    def insert_artificial_artefacts(self, amount=1333, intensity="Random", int_min=50, int_max=350):
         for i, cutout in enumerate(self.cutouts):
-            self.cutouts[i], self.art_artefacts_coords[i], _ = artificial_cores.insert_art_artefacts(cutout, amount)     
+            self.cutouts[i], self.art_artefacts_coords[i], _ = artificial_cores.insert_art_artefacts(cutout, amount, intensity=intensity, int_min=int_min, int_max=int_max)
     
     # Get a list of coordinates of identified artefacts.
     def identify_artefacts(self) -> List[Tuple]:
@@ -149,20 +153,29 @@ class Classifier:
         wavelet_absolute_threshold = 10  # Aboslute mimimum of the summed wavlet peaks
         min_dist_between_peaks = 1  # Minimum number of pixels required between each peak
         visual_padding = 31  # Padding around indetified peaks to be shown when plotting
+        
         artificial_cores = 1100  # Number of artificial cores to insert
         artificial_kernel_size = 15
-        artificial_artefacts = 50 #Number of artificial artefacts to insert
+        intensity_value_art_cores = "Random" #Random intensity value if "Random", write number for fixed intensity
+        artificial_cores_intensity_min = 50 #minimum intensity value 
+        artificial_cores_intensity_max = 350 #minimum intensity value high
+        
+        artificial_artefacts = 1000 #Number of artificial artefacts to insert
+        intensity_value_art_artefacts = "Random" #Random intensity value if "Random", write number for fixed intensity
+        artificial_artefacts_intensity_min = 50 #minimum intensity value artefacts
+        artificial_artefacts_intensity_max = 350 #maximum intensity value artefacts
+        
         unsh_mask_absolute_threshold = 5  # Aboslute mimimum of the unsharp mask
         unsh_mask_sigma = 1 # Sigma of unsharp mask
         
-        
-        
         if insert_artificial_cores:
-            self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size)
-        
+            print("Inserting artificial cores")
+            self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
+            print("Insertion done")
         if insert_artificial_artefacts:
-            self.insert_artificial_artefacts(amount=artificial_artefacts)
-
+            print("Inserting artificial artefacts")
+            self.insert_artificial_artefacts(amount=artificial_artefacts, intensity=intensity_value_art_artefacts, int_min=artificial_artefacts_intensity_min, int_max=artificial_artefacts_intensity_max)
+            print("Insertion done")
 
         for i, slice in enumerate(tqdm(self.cutouts)):
             
@@ -176,13 +189,22 @@ class Classifier:
             masks = []
             
             if unsharp_mask:
+                print("\n")
+                print("creating unsharp mask")
+                start = time.time()
                 unsh = (slice - gaussian(slice, sigma=unsh_mask_sigma))
                 unsh_mask = unsh > unsh_mask_absolute_threshold
                 processed_data.append(unsh)
                 masks.append(unsh_mask)
+                end = time.time()
+                print("Creating unsharp mask done")
+                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)))
+                
                 
             if wavelet:
                 # Run a 'haar' wavelet function over the data
+                print("Running wavelet")
+                start = time.time()
                 w = Classifier.discrete_2d_wavelet(slice, wavlet_levels)
                 w_sums = w[1][0] + w[1][1] + w[1][2]  # Sum the horizontal, vertical, and diagonal return values
     
@@ -191,21 +213,39 @@ class Classifier:
                 w_mask = w_sums > wavelet_absolute_threshold
                 processed_data.append(w_sums)
                 masks.append(w_mask)
+                end = time.time()
+                print("Running wavelet done")
+                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)))
             
             for j in range(len(processed_data)):
                 # Create a mask of only the peaks
+                print("creating masks of peaks...")
+                start = time.time()
                 local_maxes = skimage.feature.peak_local_max(processed_data[j], min_distance=min_dist_between_peaks, labels = definition.pad_mask(masks[j], check_bbox_size))
                 peaks_mask = np.zeros(processed_data[j].shape, dtype=bool)
                 peaks_mask[local_maxes[:, 0], local_maxes[:, 1]] = True
+                end = time.time()
+                print("creating mask of peaks done")
+                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)))
                 
                 # Test against definition
+                print("testing agains defenition...")
+                start = time.time()
                 dense_cores_mask, def_plot_arr = definition.test_def(processed_data[j], peaks_mask, length, mult, lowest_peak_height, step=2, max_diff=0.005)
                 padded_dense_cores_mask = definition.pad_mask(dense_cores_mask, visual_padding)
+                end = time.time()
+                print("testing agains defenition done")
+                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)))
                 
                 # Remove artefacts
+                print("Removing artefacts...")
+                start = time.time()
                 lr_min_mask, lr_min_plot_arr = artefacts.lr_min(processed_data[j], dense_cores_mask, 50)
                 circ_avg_min_mask, circ_avg_min_plot_arr = artefacts.circ_avg_min(processed_data[j], dense_cores_mask, 50)
                 dense_cores_mask = dense_cores_mask & np.logical_not(lr_min_mask) & np.logical_not(circ_avg_min_mask)
+                end = time.time()
+                print("Removing artefacts done")
+                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)))
                 
                 dense_cores_values = processed_data[j][dense_cores_mask]
                 dense_cores_coordinates = list(zip(*np.where(dense_cores_mask == True)[::-1]))
@@ -243,17 +283,17 @@ class Classifier:
                             min_index = np.argmin(distances)
                             if distances[min_index] < 25: #51 size of artificial artefact
                                 num_found += 1
-                                
+                             
                     print(f"Found {num_found}/{len(self.art_artefacts_coords[i])} inserted cores. ({num_found/len(self.art_artefacts_coords[i])}%)")
                     nl = "\n"
-                    print(f"Did not find the following artificial artefacts:{nl.join(str(c) for c in self.art_artefacts_coords[i])}")
+                    #print(f"Did not find the following artificial artefacts:{nl.join(str(c) for c in self.art_artefacts_coords[i])}")
     
     
                 padded_dense_cores = np.where(padded_dense_cores_mask, slice, slice*0.1)
                 # plot_general((slice, padded_dense_cores, np.where(definition.pad_mask(not_found_mask, visual_padding), slice, 0)), title="Original, Found, Not found")
                 plot_general((slice, padded_dense_cores), title="Original, Found", norm=colors.Normalize(0, 70), dpi=100)
                 
-                plot_def_and_artefacts(processed_data[j], slice, range(0, 10000), 50, length, mult, lowest_peak_height, def_plot_arr, lr_min_plot_arr, circ_avg_min_plot_arr, onlyArtefacts=True)
+                #plot_def_and_artefacts(processed_data[j], slice, range(0, 10000), 50, length, mult, lowest_peak_height, def_plot_arr, lr_min_plot_arr, circ_avg_min_plot_arr, onlyArtefacts=True)
                 
                 #artefact_rows, artefact_cols = np.where(lr_min_mask & circ_avg_min_mask)
                 #for j in range(len(artefact_rows)):
@@ -274,13 +314,13 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = ""
+    src_path = "C:/Users/Tage/Programmering/AoP80/Q1-latest-whigal-85.fits"
 
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 0_0, 4_000
-    Y_LOWER, Y_UPPER = 0, 4_000
+    X_LOWER, X_UPPER = 0_0, 25_000
+    Y_LOWER, Y_UPPER = 0, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
-    sc.run(True, False, insert_artificial_cores=False, insert_artificial_artefacts=False)
+    sc.run(True, False, insert_artificial_cores=True, insert_artificial_artefacts=True)
