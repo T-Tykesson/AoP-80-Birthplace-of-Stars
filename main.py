@@ -143,7 +143,6 @@ class Classifier:
 
 
     def run(self, unsharp_mask, wavelet, insert_artificial_cores=True, insert_artificial_artefacts=True): 
-
         # Definition parameters
         length = 131  # Size of box to expand around peaks when checking against the definition of a d.c.
         mult = 3  # Factor that peak has to exceed surrounding standard deviation
@@ -171,11 +170,11 @@ class Classifier:
         if insert_artificial_cores:
             print("Inserting artificial cores")
             self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
-            print("Insertion done")
+            print("Insertion done", "\n")
         if insert_artificial_artefacts:
             print("Inserting artificial artefacts")
             self.insert_artificial_artefacts(amount=artificial_artefacts, intensity=intensity_value_art_artefacts, int_min=artificial_artefacts_intensity_min, int_max=artificial_artefacts_intensity_max)
-            print("Insertion done")
+            print("Insertion done", "\n")
 
         for i, slice in enumerate(tqdm(self.cutouts)):
             
@@ -189,8 +188,7 @@ class Classifier:
             masks = []
             
             if unsharp_mask:
-                print("\n")
-                print("creating unsharp mask")
+                print("\n", "Creating unsharp mask")
                 start = time.time()
                 unsh = (slice - gaussian(slice, sigma=unsh_mask_sigma))
                 unsh_mask = unsh > unsh_mask_absolute_threshold
@@ -198,12 +196,11 @@ class Classifier:
                 masks.append(unsh_mask)
                 end = time.time()
                 print("Creating unsharp mask done")
-                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)))
-                
+                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")  
                 
             if wavelet:
                 # Run a 'haar' wavelet function over the data
-                print("Running wavelet")
+                print("\n", "Running wavelet")
                 start = time.time()
                 w = Classifier.discrete_2d_wavelet(slice, wavlet_levels)
                 w_sums = w[1][0] + w[1][1] + w[1][2]  # Sum the horizontal, vertical, and diagonal return values
@@ -215,27 +212,27 @@ class Classifier:
                 masks.append(w_mask)
                 end = time.time()
                 print("Running wavelet done")
-                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)))
+                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
             
             for j in range(len(processed_data)):
                 # Create a mask of only the peaks
-                print("creating masks of peaks...")
+                print("Creating masks of peaks...")
                 start = time.time()
                 local_maxes = skimage.feature.peak_local_max(processed_data[j], min_distance=min_dist_between_peaks, labels = definition.pad_mask(masks[j], check_bbox_size))
                 peaks_mask = np.zeros(processed_data[j].shape, dtype=bool)
                 peaks_mask[local_maxes[:, 0], local_maxes[:, 1]] = True
                 end = time.time()
-                print("creating mask of peaks done")
-                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)))
+                print("Creating mask of peaks done")
+                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
                 
                 # Test against definition
-                print("testing agains defenition...")
+                print("Testing agains defenition...")
                 start = time.time()
                 dense_cores_mask, def_plot_arr = definition.test_def(processed_data[j], peaks_mask, length, mult, lowest_peak_height, step=2, max_diff=0.005)
                 padded_dense_cores_mask = definition.pad_mask(dense_cores_mask, visual_padding)
                 end = time.time()
-                print("testing agains defenition done")
-                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)))
+                print("Testing agains defenition done")
+                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
                 
                 # Remove artefacts
                 print("Removing artefacts...")
@@ -245,14 +242,14 @@ class Classifier:
                 dense_cores_mask = dense_cores_mask & np.logical_not(lr_min_mask) & np.logical_not(circ_avg_min_mask)
                 end = time.time()
                 print("Removing artefacts done")
-                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)))
-                
+                print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
+   
                 dense_cores_values = processed_data[j][dense_cores_mask]
                 dense_cores_coordinates = list(zip(*np.where(dense_cores_mask == True)[::-1]))
-                print("Dense cores identified:", len(dense_cores_coordinates))
-                
+                print("Dense cores identified:", len(dense_cores_coordinates), "\n")
+ 
                 artefacts_coordinates = list(zip(*np.where(lr_min_mask & circ_avg_min_mask)[::-1]))
-                print("Artefacts identidied:", len(artefacts_coordinates))
+                print("Artefacts identidied:", len(artefacts_coordinates), "\n")
                 
                 if insert_artificial_cores:
                     print("Checking found cores versus inserted cores.")
@@ -269,7 +266,7 @@ class Classifier:
                     
                     print(f"Found {num_found}/{len(self.art_cores_coords[i])} inserted cores. ({num_found/len(self.art_cores_coords[i])}%)")
                     nl = "\n"
-                    print(f"Did not find the following artificial cores:{nl.join(str(c) for c in self.art_cores_coords[i])}")
+                    #print(f"Did not find the following artificial cores:{nl.join(str(c) for c in self.art_cores_coords[i])}")
                 
                 if insert_artificial_artefacts:
                     print("Checking found cores versus inserted cores.")
@@ -319,8 +316,8 @@ if __name__ == "__main__":
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 0_0, 25_000
+    X_LOWER, X_UPPER = 0_0, 15_000
     Y_LOWER, Y_UPPER = 0, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
-    sc.run(True, False, insert_artificial_cores=True, insert_artificial_artefacts=True)
+    sc.run(False, True, insert_artificial_cores=True, insert_artificial_artefacts=True)
