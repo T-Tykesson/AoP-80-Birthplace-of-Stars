@@ -254,7 +254,7 @@ class Classifier:
                 start = time.time()
                 lr_min_mask, lr_min_plot_arr = artefacts.lr_min(processed_data[j], dense_cores_mask, 50)
                 circ_avg_min_mask, circ_avg_min_plot_arr = artefacts.circ_avg_min(processed_data[j], dense_cores_mask, 50)
-                artefacts_mask = lr_min_mask & circ_avg_min_mask
+                artefacts_mask = lr_min_mask | circ_avg_min_mask
                 dense_cores_mask = dense_cores_mask & np.logical_not(artefacts_mask)
                 padded_dense_cores_mask_no_artefacts = definition.pad_mask(dense_cores_mask, visual_padding)
                 padded_artefacts_mask = definition.pad_mask(artefacts_mask, visual_padding)
@@ -324,7 +324,7 @@ class Classifier:
                 #plot_general((slice, padded_dense_cores), title="Original, Found", norm=colors.Normalize(0, 70), dpi=100)
                 plot_def_and_artefacts(processed_data[j], slice, range(0, 10), 50, length, mult, lowest_peak_height, def_plot_arr, lr_min_plot_arr, circ_avg_min_plot_arr, onlyArtefacts=False, onlyPos=True)
                 
-                #artefact_rows, artefact_cols = np.where(lr_min_mask & circ_avg_min_mask)
+                #artefact_rows, artefact_cols = np.where(lr_min_mask | circ_avg_min_mask)
                 #for j in range(len(artefact_rows)):
                 #    plot(slice[(artefact_rows[j] - 25):(artefact_rows[j] + 25), (artefact_cols[j] - 25):(artefact_cols[j] + 25)], cmap="hot")
                     
