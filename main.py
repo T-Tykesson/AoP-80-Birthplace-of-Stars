@@ -172,10 +172,10 @@ class Classifier:
         artificial_cores_intensity_min = 50 #minimum intensity value 
         artificial_cores_intensity_max = 350 #minimum intensity value high
         
-        artificial_artefacts = 1000 #Number of artificial artefacts to insert
+        artificial_artefacts = 200 #Number of artificial artefacts to insert
         intensity_value_art_artefacts = "Random" #Random intensity value if "Random", write number for fixed intensity
-        artificial_artefacts_intensity_min = 50 #minimum intensity value artefacts
-        artificial_artefacts_intensity_max = 350 #maximum intensity value artefacts
+        artificial_artefacts_intensity_min = 25 #minimum intensity value artefacts
+        artificial_artefacts_intensity_max = 75 #maximum intensity value artefacts
         
         unsh_mask_absolute_threshold = 5  # Aboslute mimimum of the unsharp mask
         unsh_mask_sigma = 1 # Sigma of unsharp mask
@@ -287,8 +287,24 @@ class Classifier:
                     
                     print(f"Found {num_found}/{len(self.art_cores_coords[i])} inserted cores. ({num_found/len(self.art_cores_coords[i])}%)")
                     nl = "\n"
-                    print(f"Did not find the following artificial cores:{nl.join(str(c) for c in self.art_cores_coords[i])}")
+                    #print(f"Did not find the following artificial cores:{nl.join(str(c) for c in self.art_cores_coords[i])}")
                 
+                if insert_artificial_artefacts:
+                    print("Checking found artefacts versus inserted artefacts.")
+                    num_found = 0
+                    for c in self.art_artefacts_coords[i][:, :2]:
+                        
+                        if tuple(c)[::-1] in artefacts_coordinates:
+                            num_found += 1
+                        else:
+                            distances = np.linalg.norm(artefacts_coordinates-c[::-1], axis=1)
+                            min_index = np.argmin(distances)
+                            if distances[min_index] < 25: #51 size of artificial artefact
+                                num_found += 1
+                                
+                    print(f"Found {num_found}/{len(self.art_artefacts_coords[i])} inserted cores. ({num_found/len(self.art_artefacts_coords[i])}%)")
+                    nl = "\n"
+                    #print(f"Did not find the following artificial artefacts:{nl.join(str(c) for c in self.art_artefacts_coords[i])}")
                 
                 # Calculate and plot mass to radius
                 peak_rows, peak_cols, _, _, _, lengths = def_plot_arr
@@ -306,7 +322,7 @@ class Classifier:
                 plot(padded_dense_cores_no_artefacts, cmap="hot", norm=colors.Normalize(0, 70), title="Defined dense cores - artefacts", dpi=300)
                 plot(padded_artefacts, cmap="hot", norm=colors.Normalize(0, 70), title="Artefacts", dpi=300)
                 #plot_general((slice, padded_dense_cores), title="Original, Found", norm=colors.Normalize(0, 70), dpi=100)
-                plot_def_and_artefacts(processed_data[j], slice, range(0, 10000), 50, length, mult, lowest_peak_height, def_plot_arr, lr_min_plot_arr, circ_avg_min_plot_arr, onlyArtefacts=False, onlyPos=True)
+                plot_def_and_artefacts(processed_data[j], slice, range(0, 10), 50, length, mult, lowest_peak_height, def_plot_arr, lr_min_plot_arr, circ_avg_min_plot_arr, onlyArtefacts=False, onlyPos=True)
                 
                 #artefact_rows, artefact_cols = np.where(lr_min_mask & circ_avg_min_mask)
                 #for j in range(len(artefact_rows)):
@@ -332,8 +348,8 @@ if __name__ == "__main__":
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 0_0, 4_000
-    Y_LOWER, Y_UPPER = 0, 4_000
+    X_LOWER, X_UPPER = 12_000, 15_000
+    Y_LOWER, Y_UPPER = 2000, 5_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
-    sc.run(False, True, insert_artificial_cores=True, insert_artificial_artefacts=True)
+    sc.run(False, True, insert_artificial_cores=False, insert_artificial_artefacts=True)
