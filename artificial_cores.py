@@ -9,7 +9,7 @@ core test
 import numpy as np
 from tqdm import tqdm
 
-def create_gaussian_filter(kernel_size, sigma=1, muu=0):
+def create_gaussian_filter(kernel_size, sigma=0.5, muu=0):
     # Initializing value of x,y as grid of kernel size
     # in the range of kernel size
     x, y = np.meshgrid(np.linspace(-1, 1, kernel_size),

@@ -7,6 +7,7 @@ from matplotlib import cm
 from matplotlib.ticker import LinearLocator
 from sys import exit
 import plotting
+from tqdm import tqdm
 
 
 # Returns the indexes of the squares (with a given size) around the 1:s in the mask.
@@ -37,6 +38,7 @@ def create_box_around_peaks(peaks_mask, size):
 
 # Returns a mask, based on a given mask of peaks, where at every 1, the corresponding pixel 
 # in the data satisifies the given definition.
+# Seems to be 2 * N complexity
 def test_def(data, peaks_mask, length, mult, lowest_val, remove_len=None, max_diff=0.1, step=6):
     
     s = np.sum(peaks_mask)
@@ -55,11 +57,11 @@ def test_def(data, peaks_mask, length, mult, lowest_val, remove_len=None, max_di
     # matrices_rows //= len(peaks_mask)
     # matrices_cols *= len(data[0])
     # matrices_cols //= len(peaks_mask[0])
-
+    
     matrices = data[expanded_matrices_rows, expanded_matrices_cols]
-
+    
     stds, means, lengths = get_std_from_matrices(matrices, remove_len, max_diff=max_diff, step=step)
-
+    
     filtered_by_def = np.bitwise_and(peak_values - means > stds * mult, peak_values - means > lowest_val)
     peaks_mask[peak_rows, peak_cols] = filtered_by_def
     
@@ -108,7 +110,7 @@ def get_std_from_matrices(matrices, remove_size=None, max_diff=0.1, step=6 ):
         sub_lists = remove_centre_from_matrices_and_flatten(matrices, remove_len=0)
         prev_std_from_sub_lists = np.std(sub_lists, axis=1)
         
-        for i in range(step + 1, max_remove_size, step):
+        for i in tqdm(range(step + 1, max_remove_size, step)):
             sub_lists = remove_centre_from_matrices_and_flatten(matrices, remove_len=i)
             std_from_sub_lists = np.std(sub_lists, axis=1)
             std_diff = prev_std_from_sub_lists - std_from_sub_lists

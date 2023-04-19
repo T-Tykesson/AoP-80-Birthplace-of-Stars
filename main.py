@@ -167,17 +167,17 @@ class Classifier:
         lowest_peak_height = 1  # Minimum above surrounding mean value
         check_bbox_size = 3  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
         wavlet_levels = 3  # Number of levels to run wavelet
-        wavelet_absolute_threshold = 35  # Aboslute mimimum of the summed wavlet peaks
-        min_dist_between_peaks = 1  # Minimum number of pixels required between each peak
+        wavelet_absolute_threshold = 30  # Aboslute mimimum of the summed wavlet peaks
+        min_dist_between_peaks = 5  # Minimum number of pixels required between each peak
         visual_padding = 31  # Padding around indetified peaks to be shown when plotting
         
-        artificial_cores = 1100  # Number of artificial cores to insert
+        artificial_cores = 1000  # Number of artificial cores to insert
         artificial_kernel_size = 15
         intensity_value_art_cores = "Random" #Random intensity value if "Random", write number for fixed intensity
         artificial_cores_size_min = 5 #min radius
-        artificial_cores_size_max = 120 #max radius
+        artificial_cores_size_max = 150 #max radius
         artificial_cores_intensity_min = 50 #minimum intensity value 
-        artificial_cores_intensity_max = 350 #minimum intensity value high
+        artificial_cores_intensity_max = 170 #minimum intensity value high
         
         artificial_artefacts = 200 #Number of artificial artefacts to insert
         intensity_value_art_artefacts = "Random" #Random intensity value if "Random", write number for fixed intensity
@@ -189,8 +189,8 @@ class Classifier:
         
         if insert_artificial_cores:
             print("Inserting artificial cores")
-            self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
-            #self.insert_artificial_cores_new(amount=artificial_cores, size_min=artificial_cores_size_min, size_max=artificial_cores_size_max, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
+            #self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
+            self.insert_artificial_cores_new(amount=artificial_cores, size_min=artificial_cores_size_min, size_max=artificial_cores_size_max, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
             print("Insertion done", "\n")
         if insert_artificial_artefacts:
             print("Inserting artificial artefacts")
@@ -290,7 +290,7 @@ class Classifier:
                         else:
                             distances = np.linalg.norm(dense_cores_coordinates-c[::-1], axis=1)
                             min_index = np.argmin(distances)
-                            if distances[min_index] < artificial_kernel_size // 3:
+                            if distances[min_index] < 15:
                                 num_found += 1
                     
                     print(f"Found {num_found}/{len(self.art_cores_coords[i])} inserted cores. ({num_found/len(self.art_cores_coords[i])}%)")
@@ -317,29 +317,18 @@ class Classifier:
                 # Calculate and plot mass to radius
                 peak_rows, peak_cols, _, _, _, lengths = def_plot_arr
                 mass_list = self.get_mass(slice, peak_rows, peak_cols, lengths)
-                scatter_plot(lengths, mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log')
+                scatter_plot(lengths, mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log', title="Dense cores")
                 
-                #art_peak_rows, art_peak_cols = self.art_cores_coords[:][0], self.art_cores_coords[:][0]
-                #print(self.art_cores_coords)
-                #print("")
-                #print(self.art_cores_coords[0][:, :2])
-                #print("")
-                #print(self.art_cores_coords[0][:, :2])
-                #print("")
-                a = self.art_cores_coords[0][:, 0]
-                b = self.art_cores_coords[0][:, 1]
-                c = self.art_cores_coords[0][:, 3]
-                print(a)
                 
-                #print("")
-                #print(self.art_cores_coords[0][:, 1])
-                #print("")
-                #print(self.art_cores_coords[:][0])
-                #print(art_peak_rows, art_peak_cols)
-                
-                artefital_mass_list = self.get_mass(slice, int(a), int(b), int(c))
-                scatter_plot(c, arteficial_mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log')
-                
+                if insert_artificial_cores:
+                    y = np.array(self.art_cores_coords[0][:, 0], dtype=int)
+                    x = np.array(self.art_cores_coords[0][:, 1], dtype=int)
+                    radius = np.array(self.art_cores_coords[0][:, 3], dtype=int)
+                    
+    
+                    artificial_mass_list = self.get_mass(slice, y, x, radius)
+                    scatter_plot(radius, artificial_mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log', title="Artificial cores")
+
                 # Get data to plot
                 padded_dense_cores = np.where(padded_dense_cores_mask, slice, slice*0.0)
                 padded_dense_cores_no_artefacts = np.where(padded_dense_cores_mask_no_artefacts, slice, slice*0.0)
@@ -366,19 +355,18 @@ class Classifier:
                 plot_general(lp_results[1:], title=f"After low pass filter using ft, r={r}")
             """
             
-        
-
+    
 
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = "C:/Users/Tage/Programmering/AoP80/Q1-latest-whigal-85.fits"
+    src_path = ""
 
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 12_000, 14_500
-    Y_LOWER, Y_UPPER = 2000, 2_500
+    X_LOWER, X_UPPER = 0_000, 10_000
+    Y_LOWER, Y_UPPER = 0, 7000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
     sc.run(False, True, insert_artificial_cores=True, insert_artificial_artefacts=False)
