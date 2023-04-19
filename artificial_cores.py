@@ -59,6 +59,28 @@ def insert_circles(data, gaussian, nr, intensity="Random", int_min=50, int_max=3
     #plot(data_copy, dpi=300, colorbar=True, title="test", vmin=np.mean(data)-1*np.std(data), vmax=(np.mean(data)+6*np.std(data)), cmap="inferno")   
     return data_copy, art_catalog
 
+def insert_circles_different_sizes(data, gaussian_list, nr, intensity="Random", int_min=50, int_max=350): #antar symetrisk gaussian
+    art_catalog = []
+    data_copy = np.array(data, copy=True)
+    for i in range(nr-1):
+        size = len(gaussian_list[i])
+        
+        xrandom = np.random.randint(0, high=len(data[1])-len(gaussian_list[i])) 
+        yrandom = np.random.randint(0, high=len(data)-len(gaussian_list[i]))
+        
+        if intensity == "Random":
+            inten = np.random.randint(int_min, int_max)
+        else: 
+            inten = intensity
+
+        art_catalog.append([int(yrandom+size/2), int(xrandom+size/2), inten, size/2]) #want to get middle of point
+        
+        data_copy[yrandom:yrandom+size,xrandom:xrandom+size] += inten*gaussian_list[i]
+    
+    #plot(data, dpi=300, colorbar=True, title="test", vmin=np.mean(data)-1*np.std(data), vmax=(np.mean(data)+6*np.std(data)), cmap="inferno")     
+    #plot(data_copy, dpi=300, colorbar=True, title="test", vmin=np.mean(data)-1*np.std(data), vmax=(np.mean(data)+6*np.std(data)), cmap="inferno")   
+    return data_copy, art_catalog
+
 def insert_art_cores_data_slices(data_list, xslice, kernel_size=20, amount=1000, intensity="Random", int_min=50, int_max=350):
     art_data_list = []
     art_catalog_list = []
@@ -94,6 +116,26 @@ def insert_art_cores(data, kernel_size=20, amount=1000, intensity="Random", int_
     art_core[~circular_mask] = 0
     
     art_data, art_catalog = insert_circles(data, art_core, amount, intensity=intensity, int_min=int_min, int_max=int_max)
+    art_catalog = np.array(art_catalog)
+    #art_catalog_list.append(art_catalog)
+
+    art_catalog_tuples = list(map(tuple, art_catalog[:,0:2]))
+    
+    return art_data, art_catalog, art_catalog_tuples
+
+def insert_art_cores_2(data, size_min=5, size_max=130, amount=1000, intensity="Random", int_min=50, int_max=350):
+    art_core_list=[]
+    for i in range(amount):
+        kernel_size = np.random.randint(size_min, size_max)
+        gaussian_core = create_gaussian_filter(kernel_size)
+        h, w = gaussian_core.shape[:2]
+        circular_mask = create_circular_mask(h, w)
+        
+        art_core = gaussian_core.copy()
+        art_core[~circular_mask] = 0
+        art_core_list.append(art_core)
+    
+    art_data, art_catalog = insert_circles_different_sizes(data, art_core_list, amount, intensity=intensity, int_min=int_min, int_max=int_max)
     art_catalog = np.array(art_catalog)
     #art_catalog_list.append(art_catalog)
 
