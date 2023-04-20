@@ -8,10 +8,14 @@ core test
 """
 import numpy as np
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 
-def create_gaussian_filter(kernel_size, sigma=0.5, muu=0):
+def create_gaussian_filter(kernel_size, sigma=0.25, muu=0):
     # Initializing value of x,y as grid of kernel size
     # in the range of kernel size
+    #sigma = np.random.uniform(0.2,0.005)
+    #print(sigma)
     x, y = np.meshgrid(np.linspace(-1, 1, kernel_size),
                        np.linspace(-1, 1, kernel_size))
     dst = np.sqrt(x**2+y**2)
@@ -19,6 +23,10 @@ def create_gaussian_filter(kernel_size, sigma=0.5, muu=0):
     normal = 1/(2.0 * np.pi * sigma**2)
     # Calculating Gaussian filter
     gauss = np.exp(-((dst-muu)**2 / (2.0 * sigma**2))) * normal
+    #print(kernel_size, kernel_size//2)
+    #plt.plot(gauss[kernel_size//2+1, :])
+    #plt.title(f"Sigma:{sigma}, Kernel:{kernel_size}")
+    #plt.show()
     return gauss
 
 "Artificial star test, all same size"
@@ -62,6 +70,74 @@ def insert_circles(data, gaussian, nr, intensity="Random", int_min=50, int_max=3
 def insert_circles_different_sizes(data, gaussian_list, nr, intensity="Random", int_min=50, int_max=350): #antar symetrisk gaussian
     art_catalog = []
     data_copy = np.array(data, copy=True)
+    """
+    kernel_size = 10
+    gaussian_core = create_gaussian_filter(kernel_size)
+    h, w = gaussian_core.shape[:2]
+    circular_mask = create_circular_mask(h, w)
+    
+    art_core = gaussian_core.copy()
+    art_core[~circular_mask] = 0
+    
+    gaussian_core_2 = create_gaussian_filter(25)
+    h, w = gaussian_core_2.shape[:2]
+    circular_mask_2 = create_circular_mask(h, w)
+    
+    art_core_2 = gaussian_core_2.copy()
+    art_core_2[~circular_mask_2] = 0
+    
+    
+    fig = plt.figure(figsize=(13, 13), dpi=300)
+
+
+    plt.rcParams['axes.grid'] = False
+    plt.axis('off')
+    plt.tight_layout()
+    plt.subplots_adjust(left=0.1,
+            bottom=0.1,
+            right=0.9,
+            top=0.9,
+            wspace=0.3,
+            hspace=0.07)
+    plt.grid(None)
+
+    ax = fig.add_subplot(2, 2, 1)
+    im = ax.imshow(gaussian_core, cmap="hot")
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.subplots_adjust(right=0.8)
+    fig.colorbar(im, cax=cax)
+    
+    ax = fig.add_subplot(2, 2, 2)
+    im = ax.imshow(art_core, cmap="hot")
+    #ax = plt.gca()
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.subplots_adjust(right=0.8)
+    fig.colorbar(im, cax=cax)
+    #axs[0].imshow(slice, cmap="hot")
+    #axs[1].imshow(smoothed, cmap="hot")
+    #art_catalog_list.append(art_catalog)
+    
+    ax = fig.add_subplot(2, 2, 3)
+    im = ax.imshow(gaussian_core_2, cmap="hot")
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.subplots_adjust(right=0.8)
+    fig.colorbar(im, cax=cax)
+    
+    ax = fig.add_subplot(2, 2, 4)
+    im = ax.imshow(art_core_2, cmap="hot")
+    #ax = plt.gca()
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    fig.subplots_adjust(right=0.8)
+    fig.colorbar(im, cax=cax)
+    plt.plot()
+    """
+    
+    #axs[0].imshow(slice, cmap="hot")
+    #axs[1].imshow(smoothed, cmap="hot")
     for i in range(nr-1):
         size = len(gaussian_list[i])
         

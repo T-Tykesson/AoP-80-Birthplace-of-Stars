@@ -163,11 +163,11 @@ class Classifier:
     def run(self, unsharp_mask, wavelet, insert_artificial_cores=True, insert_artificial_artefacts=True): 
         # Definition parameters
         length = 131  # Size of box to expand around peaks when checking against the definition of a d.c.
-        mult = 3  # Factor that peak has to exceed surrounding standard deviation
+        mult = 5  # Factor that peak has to exceed surrounding standard deviation
         lowest_peak_height = 1  # Minimum above surrounding mean value
         check_bbox_size = 3  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
         wavlet_levels = 3  # Number of levels to run wavelet
-        wavelet_absolute_threshold = 30  # Aboslute mimimum of the summed wavlet peaks
+        wavelet_absolute_threshold = 5  # Aboslute mimimum of the summed wavlet peaks
         min_dist_between_peaks = 5  # Minimum number of pixels required between each peak
         visual_padding = 31  # Padding around indetified peaks to be shown when plotting
         
@@ -175,7 +175,7 @@ class Classifier:
         artificial_kernel_size = 15
         intensity_value_art_cores = "Random" #Random intensity value if "Random", write number for fixed intensity
         artificial_cores_size_min = 5 #min radius
-        artificial_cores_size_max = 150 #max radius
+        artificial_cores_size_max = 25 #max radius
         artificial_cores_intensity_min = 50 #minimum intensity value 
         artificial_cores_intensity_max = 170 #minimum intensity value high
         
@@ -233,6 +233,8 @@ class Classifier:
                 w_mask = w_sums > wavelet_absolute_threshold
                 processed_data.append(w_sums)
                 masks.append(w_mask)
+                
+                #plot(definition.pad_mask(w_mask, 51)*slice, cmap="hot", norm=colors.Normalize(0, 70), title="Defined dense cores", dpi=300)
                 end = time.time()
                 print("Running wavelet done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
@@ -267,7 +269,7 @@ class Classifier:
                 padded_dense_cores_mask_no_artefacts = definition.pad_mask(dense_cores_mask, visual_padding)
                 padded_artefacts_mask = definition.pad_mask(artefacts_mask, visual_padding)
                 
-                dense_cores_mask = dense_cores_mask & np.logical_not(lr_min_mask) & np.logical_not(circ_avg_min_mask)
+               
                 end = time.time()
                 print("Removing artefacts done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
@@ -340,7 +342,7 @@ class Classifier:
                 plot(padded_dense_cores_no_artefacts, cmap="hot", norm=colors.Normalize(0, 70), title="Defined dense cores - artefacts", dpi=300)
                 plot(padded_artefacts, cmap="hot", norm=colors.Normalize(0, 70), title="Artefacts", dpi=300)
                 #plot_general((slice, padded_dense_cores), title="Original, Found", norm=colors.Normalize(0, 70), dpi=100)
-                plot_def_and_artefacts(processed_data[j], slice, range(0, 10), 50, length, mult, lowest_peak_height, def_plot_arr, lr_min_plot_arr, circ_avg_min_plot_arr, onlyArtefacts=False, onlyPos=True)
+                plot_def_and_artefacts(processed_data[j], slice, range(0, 1000), 50, length, mult, lowest_peak_height, def_plot_arr, lr_min_plot_arr, circ_avg_min_plot_arr, onlyArtefacts=False, onlyPos=True)
                 
                 #artefact_rows, artefact_cols = np.where(lr_min_mask | circ_avg_min_mask)
                 #for j in range(len(artefact_rows)):
@@ -365,8 +367,8 @@ if __name__ == "__main__":
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 0_000, 10_000
-    Y_LOWER, Y_UPPER = 0, 7000
+    X_LOWER, X_UPPER = 0_000, 2_500
+    Y_LOWER, Y_UPPER = 0, 2500
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
-    sc.run(False, True, insert_artificial_cores=True, insert_artificial_artefacts=False)
+    sc.run(False, True, insert_artificial_cores=True, insert_artificial_artefacts=True)
