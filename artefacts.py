@@ -179,6 +179,20 @@ def create_circular_mask(h, w, center=None, radius=None):
     mask_outer = dist_from_center <= radius
     mask = mask_outer^mask_inner
     return mask
+    
+def create_filled_circular_mask(h, w, center=None, radius=None):
+    if center is None: # use the middle of the image
+        center = (int(w/2), int(h/2))
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    mask_inner = dist_from_center <= (radius-1)
+    mask_outer = dist_from_center <= radius
+    mask = mask_outer
+    return mask
 
 # Calculates average intensity of rings from radius 0 to given max radius at every 1 in the given mask.
 def check_circular_multiple(data, mask, radius_max):
