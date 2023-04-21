@@ -159,7 +159,7 @@ class Classifier:
             mass_list.append(mass)
         return mass_list
         
-    def get_radius(self, data, rows, cols)
+    def get_radius(self, data, rows, cols):
         radius_list = np.zeros(len(rows))
         for i in range(len(rows)):
             data_square = data[(rows[i]-int(lengths[i])):(rows[i]+int(lengths[i])), (cols[i]-int(lengths[i])):(cols[i]+int(lengths[i]))]
@@ -376,7 +376,7 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = ""
+    src_path = "Q1-latest-whigal-85.fits"
 
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
