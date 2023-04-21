@@ -15,6 +15,7 @@ from skimage.filters import gaussian, unsharp_mask, threshold_otsu, threshold_lo
 import numpy as np
 from tqdm import tqdm
 import scipy.fft as scifft
+from scipy import interpolate
 from scipy.ndimage import gaussian_filter
 
 from typing import Tuple, List
@@ -166,14 +167,20 @@ class Classifier:
                 radius_list.append(0)
                 continue
             data_square = data[(rows[i]-30):(rows[i]+30), (cols[i]-30):(cols[i]+30)]
-            avers = artefacts.check_circular(data_square, 0, 0, 60, 60, 50)
+            plt.imshow(data_square)
+            avers = artefacts.check_circular(data_square, 30, 30, 60, 60, 50)
             peak = avers[0]
-            xs = range(0, len(avers[i]))
-            spl = interpolate.splrep(xs, avers[i], s=s)
-            x2 = np.linspace(0, len(avers[i]), len(avers[i])*100)
+            xs = range(0, len(avers))
+            spl = interpolate.splrep(xs, avers)
+            x2 = np.linspace(0, len(avers), len(avers)*100)
             y2 = interpolate.splev(x2, spl)
-            zero_crossings = numpy.where(numpy.diff(numpy.sign(y2 - peak/2)))[0]
-            return x2[zero_crossings[0]]
+            for i in range(len(x2)):
+                if y2[i] < peak/2:
+                    radius_list.append(x2[i])
+                    break
+                else:
+                    radius_list.append(0)
+        return radius_list
             
 
     def run(self, unsharp_mask, wavelet, insert_artificial_cores=True, insert_artificial_artefacts=True): 
