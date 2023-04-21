@@ -14,8 +14,10 @@ from mpl_toolkits.axes_grid1.axes_divider import make_axes_locatable
 def create_gaussian_filter(kernel_size, sigma=0.25, muu=0):
     # Initializing value of x,y as grid of kernel size
     # in the range of kernel size
-    #sigma = np.random.uniform(0.2,0.005)
+    #sigma = np.random.uniform(0.25,0.05)
+    
     #print(sigma)
+    
     x, y = np.meshgrid(np.linspace(-1, 1, kernel_size),
                        np.linspace(-1, 1, kernel_size))
     dst = np.sqrt(x**2+y**2)
@@ -70,7 +72,7 @@ def insert_circles(data, gaussian, nr, intensity="Random", int_min=50, int_max=3
 def insert_circles_different_sizes(data, gaussian_list, nr, intensity="Random", int_min=50, int_max=350): #antar symetrisk gaussian
     art_catalog = []
     data_copy = np.array(data, copy=True)
-    """
+    
     kernel_size = 10
     gaussian_core = create_gaussian_filter(kernel_size)
     h, w = gaussian_core.shape[:2]
@@ -134,11 +136,11 @@ def insert_circles_different_sizes(data, gaussian_list, nr, intensity="Random", 
     fig.subplots_adjust(right=0.8)
     fig.colorbar(im, cax=cax)
     plt.plot()
-    """
+    
     
     #axs[0].imshow(slice, cmap="hot")
     #axs[1].imshow(smoothed, cmap="hot")
-    for i in range(nr-1):
+    for i in range(nr):
         size = len(gaussian_list[i])
         
         xrandom = np.random.randint(0, high=len(data[1])-len(gaussian_list[i])) 
@@ -214,6 +216,8 @@ def insert_art_cores_2(data, size_min=5, size_max=130, amount=1000, intensity="R
     art_data, art_catalog = insert_circles_different_sizes(data, art_core_list, amount, intensity=intensity, int_min=int_min, int_max=int_max)
     art_catalog = np.array(art_catalog)
     #art_catalog_list.append(art_catalog)
+    
+
 
     art_catalog_tuples = list(map(tuple, art_catalog[:,0:2]))
     
