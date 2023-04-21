@@ -301,11 +301,11 @@ def lr_min(data, mask, x_view, low = 8, high = 20, s=15):
     return artefact_mask, [center_xs, center_ys, smoothed_list, first_left_index_list, first_right_index_list, artefact_list]
 
 ## Takes the average intensity of the ring at radius r. Center is the center of the dense core, h = height of data and w = width of data, radius_max is the total size of the circle.
-def check_circular(data, center, h, w, radius_max):
+def check_circular(data, peak_x, peak_y, h, w, radius_max):
     aver = np.zeros(radius_max)
-    aver[0] = data[center[1], center[0]]
+    aver[0] = data[peak_y, peak_x]
     for r in range(1,radius_max):
-        mask = create_circular_mask(h,w, center = center, radius = r)
+        mask = create_circular_mask(h,w, center = [peak_x, peak_y], radius = r)
         aver[r] = np.sum(mask*data)/(mask > 0).sum()
     return aver
 

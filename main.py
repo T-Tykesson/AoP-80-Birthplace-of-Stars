@@ -160,10 +160,13 @@ class Classifier:
         return mass_list
         
     def get_radius(self, data, rows, cols):
-        radius_list = np.zeros(len(rows))
+        radius_list = []
         for i in range(len(rows)):
-            data_square = data[(rows[i]-int(lengths[i])):(rows[i]+int(lengths[i])), (cols[i]-int(lengths[i])):(cols[i]+int(lengths[i]))]
-            avers = artefact.check_circular(data_square, 50)
+            if rows[i] > len(data) - 30 or cols[i] > len(data[0]) - 30 or cols[i] - 30 < 0 or rows[i] - 30 < 0:
+                radius_list.append(0)
+                continue
+            data_square = data[(rows[i]-30):(rows[i]+30), (cols[i]-30):(cols[i]+30)]
+            avers = artefacts.check_circular(data_square, 0, 0, 60, 60, 50)
             peak = avers[0]
             xs = range(0, len(avers[i]))
             spl = interpolate.splrep(xs, avers[i], s=s)
@@ -184,7 +187,7 @@ class Classifier:
         min_dist_between_peaks = 5  # Minimum number of pixels required between each peak
         visual_padding = 31  # Padding around indetified peaks to be shown when plotting
         
-        artificial_cores = 1000  # Number of artificial cores to insert
+        artificial_cores = 10  # Number of artificial cores to insert
         artificial_kernel_size = 15
         intensity_value_art_cores = "Random" #Random intensity value if "Random", write number for fixed intensity
         artificial_cores_size_min = 5 #min radius
@@ -192,7 +195,7 @@ class Classifier:
         artificial_cores_intensity_min = 50 #minimum intensity value 
         artificial_cores_intensity_max = 170 #minimum intensity value high
         
-        artificial_artefacts = 200 #Number of artificial artefacts to insert
+        artificial_artefacts = 10 #Number of artificial artefacts to insert
         intensity_value_art_artefacts = "Random" #Random intensity value if "Random", write number for fixed intensity
         artificial_artefacts_intensity_min = 25 #minimum intensity value artefacts
         artificial_artefacts_intensity_max = 75 #maximum intensity value artefacts
@@ -381,8 +384,8 @@ if __name__ == "__main__":
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 0_000, 2_500
-    Y_LOWER, Y_UPPER = 0, 2500
+    X_LOWER, X_UPPER = 0_000, 1_000
+    Y_LOWER, Y_UPPER = 0, 1000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
     sc.run(False, True, insert_artificial_cores=True, insert_artificial_artefacts=True)
