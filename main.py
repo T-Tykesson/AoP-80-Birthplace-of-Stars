@@ -167,19 +167,40 @@ class Classifier:
                 radius_list.append(0)
                 continue
             data_square = data[(rows[i]-30):(rows[i]+30), (cols[i]-30):(cols[i]+30)]
-            plt.imshow(data_square)
-            avers = artefacts.check_circular(data_square, 30, 30, 60, 60, 50)
+            
+            #if i < 25: #choose value to plot
+            #    plt.imshow(data_square)
+            #    plt.show()
+                
+            avers = artefacts.check_circular(data_square, 30, 30, 60, 60, 25)
+            #print(avers)
             peak = avers[0]
             xs = range(0, len(avers))
             spl = interpolate.splrep(xs, avers)
+            #print(spl)
             x2 = np.linspace(0, len(avers), len(avers)*100)
             y2 = interpolate.splev(x2, spl)
+            #print(x2)
+            #print(y2)
+            #plt.plot(x2, y2)
+            #plt.show()
+            found_radius = False
             for i in range(len(x2)):
                 if y2[i] < peak/2:
-                    radius_list.append(x2[i])
+                    radius = np.round(x2[i], decimals=2)
+                    radius_list.append(radius)
+                    found_radius = True
                     break
-                else:
-                    radius_list.append(0)
+            
+            if not found_radius:
+                radius = 0
+                radius_list.append(0)
+                    
+            if radius > 20:
+                plt.title(f"Plotting dense core if radius greater than 20, radius: {radius}")
+                plt.imshow(data_square)
+                plt.show()
+                
         return radius_list
             
 
@@ -189,25 +210,25 @@ class Classifier:
         mult = 4  # Factor that peak has to exceed surrounding standard deviation
         lowest_peak_height = 1  # Minimum above surrounding mean value
         check_bbox_size = 3  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
-        wavlet_levels = 3  # Number of levels to run wavelet
+        wavlet_levels = 1  # Number of levels to run wavelet
         wavelet_absolute_threshold = 4  # Aboslute mimimum of the summed wavlet peaks
         min_dist_between_peaks = 5  # Minimum number of pixels required between each peak
         visual_padding = 81  # Padding around indetified peaks to be shown when plotting
         
-        artificial_cores = 3000  # Number of artificial cores to insert
+        artificial_cores = 1000  # Number of artificial cores to insert
         artificial_kernel_size = 15
         intensity_value_art_cores = "Random" #Random intensity value if "Random", write number for fixed intensity
         artificial_cores_size_min = 5 #min radius
         artificial_cores_size_max = 25 #max radius
-        artificial_cores_intensity_min = 1 #minimum intensity value  50
-        artificial_cores_intensity_max = 20 #minimum intensity value high 170
+        artificial_cores_intensity_min = 5 #minimum intensity value  50
+        artificial_cores_intensity_max = 30 #minimum intensity value high 170
         
         artificial_artefacts = 500 #Number of artificial artefacts to insert
         intensity_value_art_artefacts = "Random" #Random intensity value if "Random", write number for fixed intensity
         artificial_artefacts_intensity_min = 25 #minimum intensity value artefacts
         artificial_artefacts_intensity_max = 75 #maximum intensity value artefacts
         
-        unsh_mask_absolute_threshold = 1  # Aboslute mimimum of the unsharp mask
+        unsh_mask_absolute_threshold = 3  # Aboslute mimimum of the unsharp mask
         unsh_mask_sigma = 1 # Sigma of unsharp mask
         
         if insert_artificial_cores:
@@ -345,17 +366,18 @@ class Classifier:
                 peak_rows, peak_cols, _, _, _, lengths = def_plot_arr
                 radius = self.get_radius(slice, peak_rows, peak_cols)
                 mass_list = self.get_mass(slice, peak_rows, peak_cols, radius)
-                scatter_plot(lengths, mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log', title="Dense cores")
+                max_rad = np.amax(radius)
+                scatter_plot(radius, mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log', title=f"Dense cores, max radius = {max_rad}")
                 
                 
                 if insert_artificial_cores:
                     y = np.array(self.art_cores_coords[0][:, 0], dtype=int)
                     x = np.array(self.art_cores_coords[0][:, 1], dtype=int)
-                    radius = np.array(self.art_cores_coords[0][:, 3], dtype=int)
-                    
+                    #radius = np.array(self.art_cores_coords[0][:, 3], dtype=int)
+                    art_radius = self.get_radius(slice, y, x)
     
-                    artificial_mass_list = self.get_mass(slice, y, x, radius)
-                    scatter_plot(radius, artificial_mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log', title="Artificial cores")
+                    artificial_mass_list = self.get_mass(slice, y, x, art_radius)
+                    scatter_plot(art_radius, artificial_mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log', title="Artificial cores")
 
                 # Get data to plot
                 padded_dense_cores = np.where(padded_dense_cores_mask, slice, slice*0.0)
@@ -388,13 +410,13 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = "C:/Users/Tage/Programmering/AoP80/Q1-latest-whigal-85.fits"
+    src_path = ""
 
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 0_000, 5_000
-    Y_LOWER, Y_UPPER = 0, 5_000
+    X_LOWER, X_UPPER = 0_000, 25_000
+    Y_LOWER, Y_UPPER = 0, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
-    sc.run(True, False, insert_artificial_cores=True, insert_artificial_artefacts=True)
+    sc.run(False, True, insert_artificial_cores=False, insert_artificial_artefacts=False)
