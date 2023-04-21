@@ -153,12 +153,28 @@ class Classifier:
                 mass_list.append(0)
                 continue
             
-            circle_mask = artefacts.create_circular_mask(int(lengths[i])*2, int(lengths[i])*2)
+            circle_mask = artefacts.create_filled_circular_mask(int(lengths[i])*2, int(lengths[i])*2)
             data_square = data[(rows[i]-int(lengths[i])):(rows[i]+int(lengths[i])), (cols[i]-int(lengths[i])):(cols[i]+int(lengths[i]))]
             mass = np.sum(data_square * circle_mask)
             mass_list.append(mass)
         return mass_list
         
+    def get_radius(self, data, rows, cols):
+        radius_list = []
+        for i in range(len(rows)):
+            if rows[i] > len(data) - 30 or cols[i] > len(data[0]) - 30 or cols[i] - 30 < 0 or rows[i] - 30 < 0:
+                radius_list.append(0)
+                continue
+            data_square = data[(rows[i]-30):(rows[i]+30), (cols[i]-30):(cols[i]+30)]
+            avers = artefacts.check_circular(data_square, 0, 0, 60, 60, 50)
+            peak = avers[0]
+            xs = range(0, len(avers[i]))
+            spl = interpolate.splrep(xs, avers[i], s=s)
+            x2 = np.linspace(0, len(avers[i]), len(avers[i])*100)
+            y2 = interpolate.splev(x2, spl)
+            zero_crossings = numpy.where(numpy.diff(numpy.sign(y2 - peak/2)))[0]
+            return x2[zero_crossings[0]]
+            
 
     def run(self, unsharp_mask, wavelet, insert_artificial_cores=True, insert_artificial_artefacts=True): 
         # Definition parameters
@@ -320,7 +336,8 @@ class Classifier:
                 
                 # Calculate and plot mass to radius
                 peak_rows, peak_cols, _, _, _, lengths = def_plot_arr
-                mass_list = self.get_mass(slice, peak_rows, peak_cols, lengths)
+                radius = self.get_radius(slice, peak_rows, peak_cols)
+                mass_list = self.get_mass(slice, peak_rows, peak_cols, radius)
                 scatter_plot(lengths, mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log', title="Dense cores")
                 
                 

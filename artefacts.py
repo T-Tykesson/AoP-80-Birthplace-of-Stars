@@ -179,6 +179,20 @@ def create_circular_mask(h, w, center=None, radius=None):
     mask_outer = dist_from_center <= radius
     mask = mask_outer^mask_inner
     return mask
+    
+def create_filled_circular_mask(h, w, center=None, radius=None):
+    if center is None: # use the middle of the image
+        center = (int(w/2), int(h/2))
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    mask_inner = dist_from_center <= (radius-1)
+    mask_outer = dist_from_center <= radius
+    mask = mask_outer
+    return mask
 
 # Calculates average intensity of rings from radius 0 to given max radius at every 1 in the given mask.
 def check_circular_multiple(data, mask, radius_max):
@@ -287,11 +301,11 @@ def lr_min(data, mask, x_view, low = 8, high = 20, s=15):
     return artefact_mask, [center_xs, center_ys, smoothed_list, first_left_index_list, first_right_index_list, artefact_list]
 
 ## Takes the average intensity of the ring at radius r. Center is the center of the dense core, h = height of data and w = width of data, radius_max is the total size of the circle.
-def check_circular(data, center, h, w, radius_max):
+def check_circular(data, peak_x, peak_y, h, w, radius_max):
     aver = np.zeros(radius_max)
-    aver[0] = data[center[1], center[0]]
+    aver[0] = data[peak_y, peak_x]
     for r in range(1,radius_max):
-        mask = create_circular_mask(h,w, center = center, radius = r)
+        mask = create_circular_mask(h,w, center = [peak_x, peak_y], radius = r)
         aver[r] = np.sum(mask*data)/(mask > 0).sum()
     return aver
 
