@@ -91,15 +91,14 @@ class Classifier:
     def gaussian_lp_mask(radius: int, shape):
         mask = np.zeros(shape)
         center = np.array((shape[0]/2, shape[1]/2))
-        for y in range(shape[0]):
-            for x in range(shape[1]):
-                distance_to_center = np.linalg.norm(np.array((y, x)) - center)
-                mask[y,x] = np.exp(-distance_to_center**2 / (2*radius*radius))
-        return mask
+        
+        m = artificial_cores.create_gaussian_filter(radius)
+        m = np.pad(m, ([(shape[0]-radius)//2, (shape[0]-radius)//2],[(shape[1]-radius)//2, (shape[1]-radius)//2]))
+        return m
 
 
     @plottable(fig_index=3, title="Low pass filter using the frequency domain")
-    def low_pass_filter_fourier(img, lp_filter_radius=100, weight=1, lo_threshold=0.02, hi_threshold=None):
+    def low_pass_filter_fourier(self, img, lp_filter_radius=100, weight=1, lo_threshold=0.02, hi_threshold=None):
         img_freqs = np.fft.fft2(img)
 
         centered_img_freqs = np.fft.fftshift(img_freqs)
@@ -113,12 +112,13 @@ class Classifier:
         filtered_img = np.fft.ifft2(filtered_img_freqs)
 
         # When returning, return log of the abs value of frequencies for more viewable plots
-        return  np.log(1+np.abs(img_freqs)), \
-                np.log(1+np.abs(centered_img_freqs)), \
-                gaus_low_freq_filter_mask, \
-                np.log(1+np.abs(filtered_centered_img_freqs)), \
-                np.log(1+np.abs(filtered_img_freqs)), \
-                np.abs(filtered_img)
+        return  np.abs(filtered_img)
+                #np.log(1+np.abs(img_freqs)), \
+                #np.log(1+np.abs(centered_img_freqs)), \
+                #gaus_low_freq_filter_mask, \
+                #np.log(1+np.abs(filtered_centered_img_freqs)), \
+                #np.log(1+np.abs(filtered_img_freqs))
+                
 
 
     @plottable(fig_index=4, title="Wavelet")
@@ -209,7 +209,7 @@ class Classifier:
             #    plt.show()
         return radius_list
 
-    def run(self, unsharp_mask, wavelet, insert_artificial_cores=True, insert_artificial_artefacts=True, save=False): 
+    def run(self, unsharp_mask, wavelet, fourier, insert_artificial_cores=True, insert_artificial_artefacts=True, save=False): 
         # Definition parameters
         length = 131  # Size of box to expand around peaks when checking against the definition of a d.c.
         mult = 4  # Factor that peak has to exceed surrounding standard deviation
@@ -235,6 +235,9 @@ class Classifier:
         intensity_value_art_artefacts = "Random" #Random intensity value if "Random", write number for fixed intensity
         artificial_artefacts_intensity_min = 25 #minimum intensity value artefacts
         artificial_artefacts_intensity_max = 75 #maximum intensity value artefacts
+        
+        fourier_lp_filter_radius = 100 # Radius of fourier low pass filter
+        fourier_absolute_threshold = 1 # Absolute threshold of fourier low pass filter
         
         if insert_artificial_cores:
             print("Inserting artificial cores")
@@ -291,6 +294,14 @@ class Classifier:
                 end = time.time()
                 print("Running wavelet done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
+            
+            if fourier:
+                print("\n", "Running fourier")
+                f = self.low_pass_filter_fourier(slice, lp_filter_radius=fourier_lp_filter_radius)
+                processed_data.append(slice - f)
+                masks.append((slice - f) > fourier_absolute_threshold)
+                print("fourier done")
+                plot(f, norm=colors.Normalize(0, 160), cmap="hot")
             
             for j in range(len(processed_data)):
                 # Create a mask of only the peaks
@@ -456,4 +467,4 @@ if __name__ == "__main__":
     Y_LOWER, Y_UPPER = 0, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
-    sc.run(False, True, insert_artificial_cores=False, insert_artificial_artefacts=False, save=False)
+    sc.run(False, False, True, insert_artificial_cores=False, insert_artificial_artefacts=False, save=False)
