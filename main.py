@@ -168,7 +168,7 @@ class Classifier:
         
     def get_radius(self, data, rows, cols):
         radius_list = []
-        size = 30
+        size = 25
         for i in range(len(rows)):
             if rows[i] > len(data) - size or cols[i] > len(data[0]) - size or cols[i] - size < 0 or rows[i] - size < 0:
                 radius_list.append(0)
@@ -207,9 +207,82 @@ class Classifier:
             #    plt.title(f"Plotting dense core if radius greater than 20, radius: {radius}")
             #    plt.imshow(data_square)
             #    plt.show()
+            
         return radius_list
 
-    def run(self, unsharp_mask, wavelet, insert_artificial_cores=True, insert_artificial_artefacts=True, save=False): 
+    def plot_cores_from_catalog(self, catalog):
+        k = 0
+        for i in catalog[0]:
+            x=i[0]
+            y=i[1]
+            size = 51
+            data_square = self.cutouts[0][(y-size):(y+size), (x-size):(x+size)]
+            
+            plt.title(f"Radius:{catalog[1][k]}, Mass:{catalog[2][k]}, Artefact:{catalog[3][k]}")
+            plt.grid(False)
+            plt.imshow(data_square)
+            plt.show()
+            k += 1
+    
+    def check_overlap(self, catalog_1, catalog_2, pixel_perfect=False, plot=False):
+        
+        if pixel_perfect:
+            overlap = np.intersect1d(catalog_1[0], catalog_2[0])
+            print("Overlap:", len(overlap))
+        else:
+            #If 
+            overlap = []
+            error = 3 #Value in pixels
+            for c in catalog_1[0]:
+                distances = np.linalg.norm(np.array([*catalog_2[0]])-list(c), axis=1)
+                min_index = np.argmin(distances)
+                if distances[min_index] < error:
+                    overlap.append(c)
+            print("Overlap:", len(overlap))
+        
+        if plot:
+            for i in overlap:
+                x=i[0]
+                y=i[1]
+                size = 51
+                data_square = self.cutouts[0][(y-size):(y+size), (x-size):(x+size)]
+                #plt.title(f"Radius:{catalog[1][k]}, Mass:{catalog[2][k]}, Artefact:{catalog[3][k]}")
+                plt.grid(False)
+                plt.imshow(data_square)
+                plt.show()
+                #k += 1
+                
+    def check_in_1_not_2(self, catalog_1, catalog_2, pixel_perfect=False, plot=False, name=None):
+        if pixel_perfect:
+            one_not_two = np.setdiff1d(catalog_1[0],catalog_2[0])
+            print(f"Only in {name}:", len(one_not_two))
+        else:
+            error = 5
+            one_not_two = []
+            for c in catalog_1[0]:
+                distances = np.linalg.norm(np.array([*catalog_2[0]])-list(c), axis=1)
+                min_index = np.argmin(distances)
+                if distances[min_index] > error:
+                    one_not_two.append(c)
+                    
+            print(f"Only in {name}:", len(one_not_two))
+        
+        if plot:
+            for i in one_not_two:
+                x=i[0]
+                y=i[1]
+                size = 51
+                #print(x)
+                #print(y)
+                data_square = self.cutouts[0][(y-size):(y+size), (x-size):(x+size)]
+                
+                #plt.title(f"Radius:{catalog[1][k]}, Mass:{catalog[2][k]}, Artefact:{catalog[3][k]}")
+                plt.grid(False)
+                plt.imshow(data_square)
+                plt.show()
+                #k += 1
+
+    def run(self, unsharp_mask, wavelet, insert_artificial_cores=True, insert_artificial_artefacts=True, save=False, compare=False): 
         # Definition parameters
         length = 131  # Size of box to expand around peaks when checking against the definition of a d.c.
         mult = 4  # Factor that peak has to exceed surrounding standard deviation
@@ -236,6 +309,19 @@ class Classifier:
         artificial_artefacts_intensity_min = 25 #minimum intensity value artefacts
         artificial_artefacts_intensity_max = 75 #maximum intensity value artefacts
         
+        if compare:
+            catalog_1 = np.load("test.npy", allow_pickle=True)
+            catalog_2 = np.load("test2.npy",allow_pickle=True)
+            #self.plot_cores_from_catalog(catalog_1[1])
+            
+            print("Found in 1:", len(catalog_1[1][1]))
+            print("Found in 2:", len(catalog_2[1][1]))
+            self.check_overlap(catalog_1[1], catalog_2[1], pixel_perfect=False, plot=False)
+            self.check_in_1_not_2(catalog_1[1], catalog_2[1], pixel_perfect=False, plot=False, name="catalog 1")
+            self.check_in_1_not_2(catalog_2[1], catalog_1[1], pixel_perfect=False, plot=False, name="catalog 2")
+            return None
+
+            
         if insert_artificial_cores:
             print("Inserting artificial cores")
             #self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
@@ -267,7 +353,7 @@ class Classifier:
                 masks.append(unsh_mask)
                 end = time.time()
                 
-                parameter_info = f"Unsharp mask, absolute threshold = {unsh_mask_absolute_threshold}, sigma = {sigma}, Other parameters: length={length}, mult={mult}, lowest_peak_height={lowest_peak_height}, check_bbox_size={check_bbox_size}, min_dist_between_peaks={min_dist_between_peaks}" 
+                parameter_info = f"Unsharp mask, absolute threshold = {unsh_mask_absolute_threshold}, sigma = {unsh_mask_sigma}, Other parameters: length={length}, mult={mult}, lowest_peak_height={lowest_peak_height}, check_bbox_size={check_bbox_size}, min_dist_between_peaks={min_dist_between_peaks}" 
 
                 print("Creating unsharp mask done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")  
@@ -358,31 +444,23 @@ class Classifier:
                 
                 if insert_artificial_artefacts:
                     print("Checking found artefacts versus inserted artefacts.")
-                    num_found = 0
+                    num_found_2 = 0
                     for c in self.art_artefacts_coords[i][:, :2]:
-                        
+                        print("c", c)
+                        print("tuple", tuple(c)[::-1])
+                        print("c[-1]", c[::-1])
                         if tuple(c)[::-1] in artefacts_coordinates:
-                            num_found += 1
+                            num_found_2 += 1
                         else:
+                            print(artefacts_coordinates-c[::-1])
                             distances = np.linalg.norm(artefacts_coordinates-c[::-1], axis=1)
                             min_index = np.argmin(distances)
                             if distances[min_index] < 5: #51 size of artificial artefact
-                                num_found += 1
-                                
-                    print(f"Found {num_found}/{len(self.art_artefacts_coords[i])} inserted artefacts. ({num_found/len(self.art_artefacts_coords[i])}%)")
+                                num_found_2 += 1
+                    
+                    print(f"Found {num_found_2}/{len(self.art_artefacts_coords[i])} inserted artefacts. ({num_found_2/len(self.art_artefacts_coords[i])}%)")
                     nl = "\n"
                     #print(f"Did not find the following artificial artefacts:{nl.join(str(c) for c in self.art_artefacts_coords[i])}")
-                
-                # Calculate and plot mass to radius
-                #peak_rows, peak_cols, _, _, _, lengths = def_plot_arr
-                #print(len(peak_rows))
-                #radius = self.get_radius(slice, peak_rows, peak_cols)
-                
-                #print("Len radius", len(radius))
-               
-                #mass_list = self.get_mass(slice, peak_rows, peak_cols, radius)
-                #max_rad = np.amax(radius)
-                #print("Zeroes mass", (mass_list==0).sum())
                 
                 radius = self.get_radius(slice, dense_x, dense_y)
                 mass_list = self.get_mass(slice, dense_x, dense_y, radius)
@@ -414,7 +492,20 @@ class Classifier:
                     file_name = "test"
                     #catalog np.array([dense_cores_coordinates, radius, mass_list], dtype=object)
                     catalog = np.array([dense_cores_and_artefacts_coordinates, radius_and_artefacts, mass_list_and_artefacts, artefact_flag], dtype=object)
-                    save_file = np.array([parameter_info, catalog], dtype=object)
+                    
+                
+                    if insert_artificial_cores and insert_artificial_artefacts:
+                        performance = f"Artificial cores percentage:{num_found}, arificial artefacts percentage:{num_found_2}"
+                        save_file = np.array([parameter_info, performance, catalog], dtype=object)
+                    elif insert_artificial_artefacts:
+                        performance = f"Arificial artefacts percentage:{num_found_2}"
+                        save_file = np.array([parameter_info, performance, catalog], dtype=object)
+                    elif insert_artificial_cores:
+                        performance = f"Artificial cores percentage:{num_found},"
+                        save_file = np.array([parameter_info, performance, catalog], dtype=object)
+                    else:
+                        save_file = np.array([parameter_info, catalog], dtype=object)
+                        
                     np.save(file_name, save_file)
                     print("Saved")
                     
@@ -447,13 +538,13 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = ""
+    src_path = "C:/Users/Tage/Programmering/AoP80/Q1-latest-whigal-85.fits"
 
     # X_LOWER, X_UPPER = 118_300, 118_900
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
-    X_LOWER, X_UPPER = 0_000, 10_000
+    X_LOWER, X_UPPER = 0_000, 30_000
     Y_LOWER, Y_UPPER = 0, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
-    sc.run(False, True, insert_artificial_cores=False, insert_artificial_artefacts=False, save=False)
+    sc.run(False, True, insert_artificial_cores=False, insert_artificial_artefacts=False, save=True, compare=False)
