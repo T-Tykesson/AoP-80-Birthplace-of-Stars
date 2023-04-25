@@ -171,42 +171,38 @@ class Classifier:
         size = 30
         for i in range(len(rows)):
             if rows[i] > len(data) - size or cols[i] > len(data[0]) - size or cols[i] - size < 0 or rows[i] - size < 0:
-                radius_list.append(0)
-                continue
+                raise ValueError("Invalid input.")
+                # radius_list.append(0)
+                # continue
             data_square = data[(rows[i]-size):(rows[i]+size), (cols[i]-size):(cols[i]+size)]
             
-            #if i < 25: #choose value to plot
-            #    plt.imshow(data_square)
-            #    plt.show()
-                
+            # Get averages of a circle of values expanding from the peak (TODO: function takes peak coords, this just hardcodes 30),
+            # to a radius of 30. avers is a list of averages indexed by radial pixels from the peak
             avers = artefacts.check_circular(data_square, size, size, 2*size, 2*size, size-5)
-            #print(avers)
             peak = avers[0]
-            xs = range(0, len(avers))
-            spl = interpolate.splrep(xs, avers)
-            #print(spl)
+
+            # Approxomate a smooth curve of these averages using smooth spline approximation
+            spl = interpolate.splrep(range(len(avers)), avers)
+            
+            # Smooth this curve further by interpolating the values by a factor of 100
             x2 = np.linspace(0, len(avers), len(avers)*100)
             y2 = interpolate.splev(x2, spl)
-            #print(x2)
-            #print(y2)
-            #plt.plot(x2, y2)
-            #plt.show()
+
+            # Traverse through the averages finding the first average to <= half the peak value
+            # ( Full width half max )
             found_radius = False
-            for i in range(len(x2)):
-                if y2[i] < peak/2:
-                    radius = np.round(x2[i], decimals=2)
+            for j in range(len(x2)):
+                if y2[j] <= peak/2:
+                    radius = np.round(x2[j], decimals=2)
                     radius_list.append(radius)
                     found_radius = True
                     break
             
             if not found_radius:
-                radius = 0
-                radius_list.append(0)
-                    
-            #if radius > 20:
-            #    plt.title(f"Plotting dense core if radius greater than 20, radius: {radius}")
-            #    plt.imshow(data_square)
-            #    plt.show()
+                raise ValueError("Radius could not be found for core", i)
+                # radius = 0
+                # radius_list.append(0)
+
         return radius_list
 
     def run(self, unsharp_mask, wavelet, fourier, insert_artificial_cores=True, insert_artificial_artefacts=True, save=False): 
