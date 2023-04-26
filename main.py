@@ -91,15 +91,14 @@ class Classifier:
     def gaussian_lp_mask(radius: int, shape):
         mask = np.zeros(shape)
         center = np.array((shape[0]/2, shape[1]/2))
-        for y in range(shape[0]):
-            for x in range(shape[1]):
-                distance_to_center = np.linalg.norm(np.array((y, x)) - center)
-                mask[y,x] = np.exp(-distance_to_center**2 / (2*radius*radius))
-        return mask
+        
+        m = artificial_cores.create_gaussian_filter(radius)
+        m = np.pad(m, ([(shape[0]-radius)//2, (shape[0]-radius)//2],[(shape[1]-radius)//2, (shape[1]-radius)//2]))
+        return m
 
 
     @plottable(fig_index=3, title="Low pass filter using the frequency domain")
-    def low_pass_filter_fourier(img, lp_filter_radius=100, weight=1, lo_threshold=0.02, hi_threshold=None):
+    def low_pass_filter_fourier(self, img, lp_filter_radius=100, weight=1, lo_threshold=0.02, hi_threshold=None):
         img_freqs = np.fft.fft2(img)
 
         centered_img_freqs = np.fft.fftshift(img_freqs)
@@ -113,12 +112,13 @@ class Classifier:
         filtered_img = np.fft.ifft2(filtered_img_freqs)
 
         # When returning, return log of the abs value of frequencies for more viewable plots
-        return  np.log(1+np.abs(img_freqs)), \
-                np.log(1+np.abs(centered_img_freqs)), \
-                gaus_low_freq_filter_mask, \
-                np.log(1+np.abs(filtered_centered_img_freqs)), \
-                np.log(1+np.abs(filtered_img_freqs)), \
-                np.abs(filtered_img)
+        return  np.abs(filtered_img)
+                #np.log(1+np.abs(img_freqs)), \
+                #np.log(1+np.abs(centered_img_freqs)), \
+                #gaus_low_freq_filter_mask, \
+                #np.log(1+np.abs(filtered_centered_img_freqs)), \
+                #np.log(1+np.abs(filtered_img_freqs))
+                
 
 
     @plottable(fig_index=4, title="Wavelet")
@@ -171,44 +171,44 @@ class Classifier:
         size = 25
         for i in range(len(rows)):
             if rows[i] > len(data) - size or cols[i] > len(data[0]) - size or cols[i] - size < 0 or rows[i] - size < 0:
-                radius_list.append(0)
-                continue
+                raise ValueError("Invalid input.")
+                # radius_list.append(0)
+                # continue
             data_square = data[(rows[i]-size):(rows[i]+size), (cols[i]-size):(cols[i]+size)]
             
-            #if i < 25: #choose value to plot
-            #    plt.imshow(data_square)
-            #    plt.show()
-                
+            # Get averages of a circle of values expanding from the peak (TODO: function takes peak coords, this just hardcodes 30),
+            # to a radius of 30. avers is a list of averages indexed by radial pixels from the peak
             avers = artefacts.check_circular(data_square, size, size, 2*size, 2*size, size-5)
-            #print(avers)
             peak = avers[0]
-            xs = range(0, len(avers))
-            spl = interpolate.splrep(xs, avers)
-            #print(spl)
+
+            # Approxomate a smooth curve of these averages using smooth spline approximation
+            spl = interpolate.splrep(range(len(avers)), avers)
+            
+            # Smooth this curve further by interpolating the values by a factor of 100
             x2 = np.linspace(0, len(avers), len(avers)*100)
             y2 = interpolate.splev(x2, spl)
-            #print(x2)
-            #print(y2)
-            #plt.plot(x2, y2)
-            #plt.show()
+
+            # Traverse through the averages finding the first average to <= half the peak value
+            # ( Full width half max )
             found_radius = False
-            for i in range(len(x2)):
-                if y2[i] < peak/2:
-                    radius = np.round(x2[i], decimals=2)
+            for j in range(len(x2)):
+                if y2[j] <= peak/2:
+                    radius = np.round(x2[j], decimals=2)
                     radius_list.append(radius)
                     found_radius = True
                     break
             
             if not found_radius:
+                #raise ValueError("Radius could not be found for core", i)
                 radius = 0
                 radius_list.append(0)
-                    
+
+            return radius_list
             #if radius > 20:
             #    plt.title(f"Plotting dense core if radius greater than 20, radius: {radius}")
             #    plt.imshow(data_square)
             #    plt.show()
-            
-        return radius_list
+
 
     def plot_cores_from_catalog(self, catalog):
         k = 0
@@ -308,6 +308,10 @@ class Classifier:
         intensity_value_art_artefacts = "Random" #Random intensity value if "Random", write number for fixed intensity
         artificial_artefacts_intensity_min = 25 #minimum intensity value artefacts
         artificial_artefacts_intensity_max = 75 #maximum intensity value artefacts
+
+        fourier_lp_filter_radius = 100 # Radius of fourier low pass filter
+        fourier_absolute_threshold = 1 # Absolute threshold of fourier low pass filter
+        
         
         if compare:
             catalog_1 = np.load("test.npy", allow_pickle=True)
@@ -321,7 +325,6 @@ class Classifier:
             self.check_in_1_not_2(catalog_2[1], catalog_1[1], pixel_perfect=False, plot=False, name="catalog 2")
             return None
 
-            
         if insert_artificial_cores:
             print("Inserting artificial cores")
             #self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
@@ -377,6 +380,14 @@ class Classifier:
                 end = time.time()
                 print("Running wavelet done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
+            
+            if fourier:
+                print("\n", "Running fourier")
+                f = self.low_pass_filter_fourier(slice, lp_filter_radius=fourier_lp_filter_radius)
+                processed_data.append(slice - f)
+                masks.append((slice - f) > fourier_absolute_threshold)
+                print("fourier done")
+                plot(f, norm=colors.Normalize(0, 160), cmap="hot")
             
             for j in range(len(processed_data)):
                 # Create a mask of only the peaks
