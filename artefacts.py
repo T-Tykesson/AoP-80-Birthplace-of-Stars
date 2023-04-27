@@ -210,7 +210,7 @@ def check_circular_multiple(data, mask, radius_max):
 # If its x is between low and high it is set as an artefact.
 # Returns a mask where at every 1 is a predicted artefact, also returns
 # an array for plotting.
-def circ_avg_min(data, mask, radius_max, low=9, high=12, s=1):
+def circ_avg_min(data, mask, radius_max, low=9, high=15, s=1):
     avers = check_circular_multiple(data, mask, radius_max)
     artefact_mask = np.zeros(mask.shape, dtype=bool)
     center_ys, center_xs = np.where(mask)
@@ -224,8 +224,8 @@ def circ_avg_min(data, mask, radius_max, low=9, high=12, s=1):
         center_y = center_ys[i]
         
         xs = range(0, len(avers[i]))
-        spl = interpolate.splrep(xs, avers[i], s=s)
-        ynew = interpolate.BSpline(*spl)(xs)
+        spl = interpolate.splrep(xs, avers[i]*max(1, 100*(1 - avers[i][0])), s=s)
+        ynew = interpolate.BSpline(*spl)(xs)/max(1, 100*(1 - avers[i][0]))
         
         mins, _ = find_peaks(-avers[i])
         mins_smooth, _ = find_peaks(-ynew)
@@ -253,7 +253,7 @@ def circ_avg_min(data, mask, radius_max, low=9, high=12, s=1):
 # If its x is between low and high it is set as an artefact.
 # Returns a mask where at every 1 is a predicted artefact, also returns
 # an array for plotting.
-def lr_min(data, mask, x_view, low = 8, high = 20, s=15):
+def lr_min(data, mask, x_view, low = 5, high = 25, s=5):
     artefact_mask = np.zeros(mask.shape, dtype=bool)
     center_ys, center_xs = np.where(mask)
     center_xs_pad = np.expand_dims(center_xs, 1)
@@ -275,8 +275,8 @@ def lr_min(data, mask, x_view, low = 8, high = 20, s=15):
         values = values_list[i]
         
         xs = range(-x_view, x_view + 1)
-        spl = interpolate.splrep(xs, values, s=s)
-        ynew = interpolate.BSpline(*spl)(xs)
+        spl = interpolate.splrep(xs, values*max(1, 150*(1 - data[center_y, center_x])), s=s)
+        ynew = interpolate.BSpline(*spl)(xs)/max(1, 150*(1 - data[center_y, center_x]))
         
         mins, _ = find_peaks(-ynew)
         mins_x_from_center = mins - x_view
@@ -287,12 +287,32 @@ def lr_min(data, mask, x_view, low = 8, high = 20, s=15):
         first_left_index = left[-1] if len(left) > 0 else None
         first_right_index = right[0] if len(right) > 0 else None
         
+        mins_not_smooth, _ = find_peaks(-values)
+        mins_x_from_center_not_smooth = mins_not_smooth - x_view
+    
+        left_not_smooth = mins_not_smooth[mins_x_from_center_not_smooth < 0]
+        right_not_smooth = mins_not_smooth[mins_x_from_center_not_smooth > 0]
+        
+        first_left_index_not_smooth = left_not_smooth[-1] if len(left_not_smooth) > 0 else None
+        first_right_index_not_smooth = right_not_smooth[0] if len(right_not_smooth) > 0 else None
+        
         artefact = False
         if first_left_index != None and first_right_index != None:
-            if -high <= first_left_index - x_view - 1 <= -low and low <= first_right_index - x_view - 1 <= high:
+            if (-high <= first_left_index - x_view - 1 <= -low and low <= first_right_index - x_view - 1 <= high) and (abs(first_right_index - first_left_index) > 5):
                 artefact = True
                 artefact_mask[center_y, center_x] = True
         
+        if first_left_index_not_smooth != None:
+            if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_left_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(values[x_view//2 - 10]) < abs(data[center_y, center_x])/10):
+                artefact = True
+                artefact_mask[center_y, center_x] = True
+        
+        if first_right_index_not_smooth != None:
+            if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_right_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(values[x_view//2 + 10]) < abs(data[center_y, center_x])/10):
+                artefact = True
+                artefact_mask[center_y, center_x] = True
+        
+            
         smoothed_list.append(ynew)
         first_left_index_list.append(first_left_index)
         first_right_index_list.append(first_right_index)

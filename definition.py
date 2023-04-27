@@ -62,7 +62,7 @@ def test_def(data, peaks_mask, length, mult, lowest_val, remove_len=None, max_di
     
     stds, means, lengths = get_std_from_matrices(matrices, remove_len, max_diff=max_diff, step=step)
     
-    filtered_by_def = np.bitwise_and(peak_values - means > stds * mult, peak_values - means > lowest_val)
+    filtered_by_def = np.logical_and(peak_values - means > stds * mult, peak_values - means > lowest_val)
     peaks_mask[peak_rows, peak_cols] = filtered_by_def
     
     # def_rows, def_cols = np.where(peaks_mask)
@@ -115,12 +115,12 @@ def get_std_from_matrices(matrices, remove_size=None, max_diff=0.1, step=6 ):
             std_from_sub_lists = np.std(sub_lists, axis=1)
             std_diff = prev_std_from_sub_lists - std_from_sub_lists
             
-            std_diff_check = np.bitwise_and(np.abs(std_diff) < max_diff, std_list == 0)
+            std_diff_check = np.logical_and(np.abs(std_diff) < max_diff, std_list == 0)
             
             prev_std_from_sub_lists = std_from_sub_lists
-
+            
             std_list[std_diff_check] = std_from_sub_lists[std_diff_check]
-            mean_list[std_diff_check] = np.mean(sub_lists[std_diff_check], axis=1)
+            mean_list[std_diff_check] = np.mean(sub_lists[std_diff_check, :], axis=1)
             length_list[std_diff_check] = i
 
             if np.sum(std_list != 0) == len(std_list):
@@ -134,10 +134,10 @@ def get_std_from_matrices(matrices, remove_size=None, max_diff=0.1, step=6 ):
         
     if (np.sum(std_list == 0) > 0):
         print(str(np.sum(std_list == 0)) + " of " + str(len(std_list)) + " matrices didn't get a converging standard deviation.")
-        mean_list[std_list == 0] = np.mean(sub_lists[std_list == 0], axis=1)
+        mean_list[std_list == 0] = np.mean(sub_lists[std_list == 0, :], axis=1)
         length_list[std_list == 0] = i
         std_list[std_list == 0] = prev_std_from_sub_lists[std_list == 0]
         print(std_list == 0)
-        
+    
     return std_list, mean_list, length_list
 

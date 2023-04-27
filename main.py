@@ -178,7 +178,7 @@ class Classifier:
             #if i < 25: #choose value to plot
             #    plt.imshow(data_square)
             #    plt.show()
-                
+            
             avers = artefacts.check_circular(data_square, size, size, 2*size, 2*size, size-5)
             #print(avers)
             peak = avers[0]
@@ -209,11 +209,11 @@ class Classifier:
             #    plt.show()
         return radius_list
 
-    def run(self, unsharp_mask, wavelet, fourier, insert_artificial_cores=True, insert_artificial_artefacts=True, save=False): 
+    def run(self, unsharp_mask, wavelet, fourier, plot_images=False,insert_artificial_cores=True, insert_artificial_artefacts=True, save=False): 
         # Definition parameters
-        length = 131  # Size of box to expand around peaks when checking against the definition of a d.c.
-        mult = 4  # Factor that peak has to exceed surrounding standard deviation
-        lowest_peak_height = 1  # Minimum above surrounding mean value
+        length = 61  # Size of box to expand around peaks when checking against the definition of a d.c.
+        mult = 5 # Factor that peak has to exceed surrounding standard deviation
+        lowest_peak_height = 0  # Minimum above surrounding mean value
         check_bbox_size = 3  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
         wavlet_levels = 1  # Number of levels to run wavelet
         wavelet_absolute_threshold = 4  # Aboslute mimimum of the summed wavlet peaks
@@ -270,7 +270,7 @@ class Classifier:
                 masks.append(unsh_mask)
                 end = time.time()
                 
-                parameter_info = f"Unsharp mask, absolute threshold = {unsh_mask_absolute_threshold}, sigma = {sigma}, Other parameters: length={length}, mult={mult}, lowest_peak_height={lowest_peak_height}, check_bbox_size={check_bbox_size}, min_dist_between_peaks={min_dist_between_peaks}" 
+                parameter_info = f"Unsharp mask, absolute threshold = {unsh_mask_absolute_threshold}, sigma = {unsh_mask_sigma}, Other parameters: length={length}, mult={mult}, lowest_peak_height={lowest_peak_height}, check_bbox_size={check_bbox_size}, min_dist_between_peaks={min_dist_between_peaks}" 
 
                 print("Creating unsharp mask done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")  
@@ -314,18 +314,20 @@ class Classifier:
                 print("Creating mask of peaks done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
                 
-                padded_peaks_mask = definition.pad_mask(peaks_mask, visual_padding)
-                plot(padded_peaks_mask*slice, cmap="hot", norm=colors.Normalize(0, 70), title="Mask", dpi=300)
+                if plot_images: padded_peaks_mask = definition.pad_mask(peaks_mask, visual_padding)
+                if plot_images: plot(padded_peaks_mask*slice, cmap="hot", norm=colors.Normalize(0, 70), title="Mask", dpi=300)
                 # Test against definition
                 print("Testing agains defenition...")
                 start = time.time()
                 dense_cores_mask, def_plot_arr = definition.test_def(processed_data[j], peaks_mask, length, mult, lowest_peak_height, step=2, max_diff=0.005)
-                padded_dense_cores_mask = definition.pad_mask(dense_cores_mask, visual_padding)
+                if plot_images: padded_dense_cores_mask = definition.pad_mask(dense_cores_mask, visual_padding)
                 dense_cores_and_artefacts_coordinates = list(zip(*np.where(dense_cores_mask == True)[::-1]))
                 dense_and_artefacts_y, dense_and_artefacts_x = np.where(dense_cores_mask == True)[::-1]
                 end = time.time()
                 print("Testing agains defenition done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
+                
+                print("\n", "Dense cores found by definition: ", len(dense_and_artefacts_x),", from ", len(np.where(masks[j])[0]))
                 
                 # Remove artefacts
                 print("Removing artefacts...")
@@ -333,9 +335,11 @@ class Classifier:
                 lr_min_mask, lr_min_plot_arr = artefacts.lr_min(processed_data[j], dense_cores_mask, 50)
                 circ_avg_min_mask, circ_avg_min_plot_arr = artefacts.circ_avg_min(processed_data[j], dense_cores_mask, 50)
                 artefacts_mask = lr_min_mask | circ_avg_min_mask
+                
                 dense_cores_mask = dense_cores_mask & np.logical_not(artefacts_mask)
-                padded_dense_cores_mask_no_artefacts = definition.pad_mask(dense_cores_mask, visual_padding)
-                padded_artefacts_mask = definition.pad_mask(artefacts_mask, visual_padding)
+                
+                
+   
                 end = time.time()
                 print("Removing artefacts done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
@@ -345,7 +349,6 @@ class Classifier:
                 dense_cores_coordinates = list(zip(*np.where(dense_cores_mask == True)[::-1]))
                 dense_y, dense_x = np.where(dense_cores_mask == True)[::-1]
                 print("Dense cores identified:", len(dense_cores_coordinates), "\n")
-
                 # Check artificial cores
                 artefacts_coordinates = list(zip(*np.where(artefacts_mask)[::-1]))
                 print("Artefacts identidied:", len(artefacts_coordinates), "\n")
@@ -395,6 +398,7 @@ class Classifier:
                 #max_rad = np.amax(radius)
                 #print("Zeroes mass", (mass_list==0).sum())
                 
+
                 radius = self.get_radius(slice, dense_x, dense_y)
                 mass_list = self.get_mass(slice, dense_x, dense_y, radius)
                 scatter_plot(radius, mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log', title=f"Dense cores")
@@ -430,17 +434,27 @@ class Classifier:
                     print("Saved")
                     
                 # Get data to plot
-                padded_dense_cores = np.where(padded_dense_cores_mask, slice, slice*0.0)
-                padded_dense_cores_no_artefacts = np.where(padded_dense_cores_mask_no_artefacts, slice, slice*0.0)
-                padded_artefacts = np.where(padded_artefacts_mask, slice, slice*0.0)
+                if plot_images:
+                    padded_dense_cores_mask_no_artefacts = definition.pad_mask(dense_cores_mask, visual_padding)
+                    padded_artefacts_mask = definition.pad_mask(artefacts_mask, visual_padding)
+                    padded_dense_cores = np.where(padded_dense_cores_mask, slice, slice*0.0)
+                    padded_dense_cores_no_artefacts = np.where(padded_dense_cores_mask_no_artefacts, slice, slice*0.0)
+                    padded_artefacts = np.where(padded_artefacts_mask, slice, slice*0.0)
+                
+                #plot_def_and_artefacts(processed_data[j], slice, range(0, 10), 50, length, mult, lowest_peak_height, def_plot_arr, lr_min_plot_arr, circ_avg_min_plot_arr, onlyArtefacts=False, onlyPos=True)
+               
                 
                 # Plot images and graphs
                 # plot_general((slice, padded_dense_cores, np.where(definition.pad_mask(not_found_mask, visual_padding), slice, 0)), title="Original, Found, Not found")
-                plot(padded_dense_cores, cmap="hot", norm=colors.Normalize(0, 70), title="Defined dense cores", dpi=300)
-                plot(padded_dense_cores_no_artefacts, cmap="hot", norm=colors.Normalize(0, 70), title="Defined dense cores - artefacts", dpi=300)
-                plot(padded_artefacts, cmap="hot", norm=colors.Normalize(0, 70), title="Artefacts", dpi=300)
-                #plot_general((slice, padded_dense_cores), title="Original, Found", norm=colors.Normalize(0, 70), dpi=100)
-                plot_def_and_artefacts(processed_data[j], slice, range(0, 1000), 50, length, mult, lowest_peak_height, def_plot_arr, lr_min_plot_arr, circ_avg_min_plot_arr, onlyArtefacts=False, onlyPos=True)
+                if plot_images:
+                    plot(padded_dense_cores, cmap="hot", norm=colors.Normalize(0, 70), title="Defined dense cores", dpi=300)
+                    plot(padded_dense_cores_no_artefacts, cmap="hot", norm=colors.Normalize(0, 70), title="Defined dense cores - artefacts", dpi=300)
+                    plot(padded_artefacts, cmap="hot", norm=colors.Normalize(0, 70), title="Artefacts", dpi=300)
+                    #plot_general((slice, padded_dense_cores), title="Original, Found", norm=colors.Normalize(0, 70), dpi=100)
+                  
+                plot_graphs_and_images(10, 10, 1, processed_data[j], peaks_mask, dense_cores_mask, 50, plot_images=True, title="Classified dense cores")
+                plot_graphs_and_images(10, 10, 1, processed_data[j], dense_cores_mask | lr_min_mask, lr_min_mask, 50, plot_images=True, title="Classified artefacts by lr min")
+                plot_graphs_and_images(10, 10, 1, processed_data[j], dense_cores_mask | circ_avg_min_mask, circ_avg_min_mask, 50, plot_images=True, title="Classified artefacts by circle avg min")
                 
                 #artefact_rows, artefact_cols = np.where(lr_min_mask | circ_avg_min_mask)
                 #for j in range(len(artefact_rows)):
@@ -464,7 +478,7 @@ if __name__ == "__main__":
     # Y_LOWER, Y_UPPER = 8_400, 9_000
 
     X_LOWER, X_UPPER = 0_000, 10_000
-    Y_LOWER, Y_UPPER = 0, 7_000
+    Y_LOWER, Y_UPPER = 0_000, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER])
-    sc.run(False, False, True, insert_artificial_cores=False, insert_artificial_artefacts=False, save=False)
+    sc.run(True, False, False, insert_artificial_cores=False, insert_artificial_artefacts=False, save=False)

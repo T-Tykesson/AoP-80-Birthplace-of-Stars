@@ -115,6 +115,54 @@ def plot_figure(func, title, norm=None, dpi=None):
     plt.colorbar(im, cax=cax)
     plt.show()
 
+def plot_graphs_and_images(width, height, amount, data, mask, dense_core_mask, length, highest_val=None, plot_images=True, title=None):
+    
+    index_list = np.array(range(np.sum(mask)))
+    index_list = index_list[(dense_core_mask[np.where(mask)]).flatten()]
+    
+    r, c = np.where(dense_core_mask)
+    
+    if highest_val != None:
+        vals = data[r, c]
+        r = r[vals <= highest_val]
+        c = c[vals <= highest_val]
+        index_list = index_list[vals <= highest_val]
+    
+    if plot_images:
+        width=width//2
+    for i in range(amount):
+        fig = plt.figure(figsize=(20,20), dpi=300)
+        if plot_images:
+            gs = fig.add_gridspec(height,width*2)
+        else:
+            gs = fig.add_gridspec(height,width)
+        for r_plot in range(height):
+            for c_plot in range(width):
+                if plot_images:
+                    ax = fig.add_subplot(gs[r_plot, c_plot*2])
+                else:
+                    ax = fig.add_subplot(gs[r_plot, c_plot])
+                index = r_plot * height + c_plot + width*height*i
+                if index > len(r) - 1:
+                    if title != None:
+                        fig.suptitle(title + ": " + str(i), fontsize=50)
+                    plt.show()
+                    return None
+                xs = range(c[index]-length//2, c[index]+length//2)
+                xs = np.maximum(xs, 0)
+                xs = np.minimum(xs, len(data[0]) - 1)
+                ys = data[r[index], xs]
+                ax.plot(xs, ys)
+                ax.axhline(y=data[r[index], c[index]], linestyle="dashed")
+                ax.set_title(str(index_list[index]) + " (" + str(c[index]) + " " + str(r[index]) + ")", fontsize=12)
+                if plot_images:
+                    ax = fig.add_subplot(gs[r_plot, c_plot*2+1])
+                    ax.imshow(data[(max(r[index]-length//2, 0)):(min(r[index]+length//2, len(data)-1)), (max(c[index]-length//2, 0)):(min(c[index]+length//2, len(data[0])-1))], norm=colors.Normalize(0,1))
+        if title != None:
+            fig.suptitle(title + ": " + str(i), fontsize=50)
+        plt.show()
+
+
 def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, length, mult, lowest_val, def_plot_arr, lr_artefacts_arr, circ_artefacts_arr, onlyPos=True, onlyArtefacts=False, artefact_df_indexing=True):
     
     # Get the lists containing the data to plot
@@ -123,7 +171,7 @@ def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, len
     center_xs, center_ys, circ_smoothed_list, circ_smoothed_index_list, avers, circ_artefact_list = circ_artefacts_arr
     
     # Initialize the artefact index
-    artefact_index = 0
+    artefact_index = np.sum(np.array(range(len(filtered_by_def)))[filtered_by_def] <= index_arr[0]) - 1
     
     # Loop through all given indexes
     for i in index_arr:
@@ -141,6 +189,8 @@ def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, len
         if (onlyArtefacts and not (lr_artefact_list[artefact_index] or circ_artefact_list[artefact_index])):
             artefact_index += 1
             continue
+        
+        
         
         # Get the view lengths
         x_view_left = max(peak_cols[i]-x_view - 1, 0)
