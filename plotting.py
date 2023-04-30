@@ -6,6 +6,8 @@ import matplotlib.colors as colors
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from math import ceil
 from tqdm import tqdm
+from pathlib import Path
+
 
 def plot_general(functions, dpi=60, fig_size=(30,13), title = None, cmap="hot", scale=1, grid=False, colorbar=True, fig_index=None, norm=None):
 
@@ -115,7 +117,7 @@ def plot_figure(func, title, norm=None, dpi=None):
     plt.colorbar(im, cax=cax)
     plt.show()
 
-def plot_graphs_and_images(width, height, amount, data, mask, dense_core_mask, length, highest_val=None, plot_images=True, title=None):
+def plot_graphs_and_images(width, height, amount, data, original_data, mask, dense_core_mask, length, highest_val=None, plot_images=True, title=None, lr_min_artefact=None, circ_avg_min_artefact=None, avg_graph=None, mins_list=None, path=None, plot=True):
     
     index_list = np.array(range(np.sum(mask)))
     index_list = index_list[(dense_core_mask[np.where(mask)]).flatten()]
@@ -127,26 +129,36 @@ def plot_graphs_and_images(width, height, amount, data, mask, dense_core_mask, l
         r = r[vals <= highest_val]
         c = c[vals <= highest_val]
         index_list = index_list[vals <= highest_val]
-    
-    if plot_images:
-        width=width//2
+    mult = 1
+    if plot_images != (avg_graph != None).any():
+        width=width//3
+        mult = 3
+    else:
+        width=width//4
+        mult = 4
+    if path != None:
+        print("plot_graphs_and_images will save plots to path: " + str(path))
     for i in range(amount):
-        fig = plt.figure(figsize=(20,20), dpi=300)
-        if plot_images:
-            gs = fig.add_gridspec(height,width*2)
-        else:
-            gs = fig.add_gridspec(height,width)
+        print("Plotting", i)
+        fig = plt.figure(figsize=(20,20), dpi=200)
+        gs = fig.add_gridspec(height,width*mult)
         for r_plot in range(height):
             for c_plot in range(width):
-                if plot_images:
-                    ax = fig.add_subplot(gs[r_plot, c_plot*2])
-                else:
-                    ax = fig.add_subplot(gs[r_plot, c_plot])
-                index = r_plot * height + c_plot + width*height*i
+                
+                ax = fig.add_subplot(gs[r_plot, c_plot*mult])
+                
+                index = r_plot * width + c_plot + width*height*i
                 if index > len(r) - 1:
                     if title != None:
                         fig.suptitle(title + ": " + str(i), fontsize=50)
-                    plt.show()
+                    if path != None:
+                        print("Saving plot: " + str(i))
+                        Path(path).mkdir(parents=True, exist_ok=True)
+                        plt.savefig(path + str(i))
+                    if plot:
+                        plt.show()
+                    else:
+                        plt.close()
                     return None
                 xs = range(c[index]-length//2, c[index]+length//2)
                 xs = np.maximum(xs, 0)
@@ -154,13 +166,36 @@ def plot_graphs_and_images(width, height, amount, data, mask, dense_core_mask, l
                 ys = data[r[index], xs]
                 ax.plot(xs, ys)
                 ax.axhline(y=data[r[index], c[index]], linestyle="dashed")
-                ax.set_title(str(index_list[index]) + " (" + str(c[index]) + " " + str(r[index]) + ")", fontsize=12)
+                ax.set_xticks([xs[len(xs)//2]-8, xs[len(xs)//2]+8, xs[len(xs)//2]-25, xs[len(xs)//2]+25])
+                if (np.array(lr_min_artefact) != None).any():
+                    ax.set_title(str(index_list[index]) + " (" + str(c[index]) + " " + str(r[index]) + ") " + str(lr_min_artefact[index]) + " " + str(circ_avg_min_artefact[index]) + str(mins_list[index]), fontsize=12)
+                else:
+                    ax.set_title(str(index_list[index]) + " (" + str(c[index]) + " " + str(r[index]) + ") " + str(mins_list[index]), fontsize=12)
+               
                 if plot_images:
-                    ax = fig.add_subplot(gs[r_plot, c_plot*2+1])
+                    ax = fig.add_subplot(gs[r_plot, c_plot*mult+mult - 2])
                     ax.imshow(data[(max(r[index]-length//2, 0)):(min(r[index]+length//2, len(data)-1)), (max(c[index]-length//2, 0)):(min(c[index]+length//2, len(data[0])-1))], norm=colors.Normalize(0,1))
+                    ax = fig.add_subplot(gs[r_plot, c_plot*mult+mult - 1])
+                    ax.imshow(original_data[(max(r[index]-length//2, 0)):(min(r[index]+length//2, len(data)-1)), (max(c[index]-length//2, 0)):(min(c[index]+length//2, len(data[0])-1))], norm=colors.Normalize(0,70))
+                    
+                if (avg_graph != None).any():
+                    ax = fig.add_subplot(gs[r_plot, c_plot*mult+1])
+                    ax.plot(range(len(avg_graph[index])), avg_graph[index])
+                    ax.set_xticks([0, 9, 15])
+                
+                    
         if title != None:
-            fig.suptitle(title + ": " + str(i), fontsize=50)
-        plt.show()
+            fig.suptitle(title + ", index:" + str(i), fontsize=50)
+        
+        if path != None:
+            print("Saving plot: " + str(i))
+            Path(path).mkdir(parents=True, exist_ok=True)
+            plt.savefig(path + str(i))
+        
+        if plot:
+            plt.show()
+        else:
+            plt.close()
 
 
 def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, length, mult, lowest_val, def_plot_arr, lr_artefacts_arr, circ_artefacts_arr, onlyPos=True, onlyArtefacts=False, artefact_df_indexing=True):

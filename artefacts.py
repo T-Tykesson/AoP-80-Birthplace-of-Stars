@@ -210,7 +210,7 @@ def check_circular_multiple(data, mask, radius_max):
 # If its x is between low and high it is set as an artefact.
 # Returns a mask where at every 1 is a predicted artefact, also returns
 # an array for plotting.
-def circ_avg_min(data, mask, radius_max, low=9, high=15, s=1):
+def circ_avg_min(data, mask, radius_max, low=9, high=15, s=0.005):
     avers = check_circular_multiple(data, mask, radius_max)
     artefact_mask = np.zeros(mask.shape, dtype=bool)
     center_ys, center_xs = np.where(mask)
@@ -218,27 +218,31 @@ def circ_avg_min(data, mask, radius_max, low=9, high=15, s=1):
     artefact_list = []
     smoothed_list = []
     smoothed_index_list = []
+    mins_list = []
     
     for i in range(len(avers)):
         center_x = center_xs[i]
         center_y = center_ys[i]
         
         xs = range(0, len(avers[i]))
-        spl = interpolate.splrep(xs, avers[i]*max(1, 100*(1 - avers[i][0])), s=s)
-        ynew = interpolate.BSpline(*spl)(xs)/max(1, 100*(1 - avers[i][0]))
+        spl = interpolate.splrep(xs, avers[i]/np.max(avers[i]), s=s)
+        ynew = interpolate.BSpline(*spl)(xs)*np.max(avers[i])
         
         mins, _ = find_peaks(-avers[i])
         mins_smooth, _ = find_peaks(-ynew)
         first_right_index = mins[0] if len(mins) > 0 else None
         first_right_index_smooth = mins_smooth[0] if len(mins_smooth) > 0 else None
         
+        mins_list.append(len(mins_smooth))
+        
         artefact = False
         if first_right_index != None:
-            if low <= first_right_index <= high:
+            if low <= first_right_index <= high: #and (len(mins) < 7) and (len(mins_smooth) < 4):
                 artefact = True
                 artefact_mask[center_y, center_x] = True
+        
         if first_right_index_smooth != None:
-            if low <= first_right_index_smooth <= high:
+            if low <= first_right_index_smooth <= high: #and (len(mins) < 7) and (len(mins_smooth) < 4):
                 artefact = True
                 artefact_mask[center_y, center_x] = True
         
@@ -247,13 +251,13 @@ def circ_avg_min(data, mask, radius_max, low=9, high=15, s=1):
         smoothed_index_list.append(first_right_index_smooth)
         
     
-    return artefact_mask, [center_xs, center_ys, smoothed_list, smoothed_index_list, avers, artefact_list]
+    return artefact_mask, [center_xs, center_ys, smoothed_list, smoothed_index_list, avers, np.array(artefact_list)], np.array(mins_list)
 
 # Checks the first local minima to the left and right of the center point, at every 1 in the given mask.
 # If its x is between low and high it is set as an artefact.
 # Returns a mask where at every 1 is a predicted artefact, also returns
 # an array for plotting.
-def lr_min(data, mask, x_view, low = 5, high = 25, s=5):
+def lr_min(data, mask, x_view, low = 8, high = 25, s=0.2):
     artefact_mask = np.zeros(mask.shape, dtype=bool)
     center_ys, center_xs = np.where(mask)
     center_xs_pad = np.expand_dims(center_xs, 1)
@@ -268,6 +272,7 @@ def lr_min(data, mask, x_view, low = 5, high = 25, s=5):
     first_left_index_list = []
     first_right_index_list = []
     artefact_list = []
+    mins_list = []
     
     for i in range(len(center_ys)):
         center_x = center_xs[i]
@@ -275,11 +280,16 @@ def lr_min(data, mask, x_view, low = 5, high = 25, s=5):
         values = values_list[i]
         
         xs = range(-x_view, x_view + 1)
-        spl = interpolate.splrep(xs, values*max(1, 150*(1 - data[center_y, center_x])), s=s)
-        ynew = interpolate.BSpline(*spl)(xs)/max(1, 150*(1 - data[center_y, center_x]))
+        spl = interpolate.splrep(xs, values/np.max(values), s=s)
+        ynew = interpolate.BSpline(*spl)(xs)*np.max(values)
         
         mins, _ = find_peaks(-ynew)
         mins_x_from_center = mins - x_view
+        
+        mins_not_smooth, _ = find_peaks(-values)
+        
+        mins_list.append(len(find_peaks(-ynew)[0]))
+        
         
         left = mins[mins_x_from_center < 0]
         right = mins[mins_x_from_center > 0]
@@ -298,19 +308,34 @@ def lr_min(data, mask, x_view, low = 5, high = 25, s=5):
         
         artefact = False
         if first_left_index != None and first_right_index != None:
-            if (-high <= first_left_index - x_view - 1 <= -low and low <= first_right_index - x_view - 1 <= high) and (abs(first_right_index - first_left_index) > 5):
+            if (-high <= first_left_index - x_view - 1 <= -low and low <= first_right_index - x_view - 1 <= high) and (abs(first_right_index - first_left_index) > 5): #and len(mins) < 8 and len(mins_not_smooth) < 8:
                 artefact = True
                 artefact_mask[center_y, center_x] = True
         
         if first_left_index_not_smooth != None:
-            if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_left_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(values[x_view//2 - 10]) < abs(data[center_y, center_x])/10):
-                artefact = True
-                artefact_mask[center_y, center_x] = True
+            if first_right_index == None:
+                if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_left_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(values[x_view//2 - 10]) < abs(data[center_y, center_x])/10) and len(mins) < 5:
+                    artefact = True
+                    artefact_mask[center_y, center_x] = True
+            else:
+                if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_left_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(ynew[first_right_index]) < abs(data[center_y, center_x])/10) and len(mins) < 5:
+                    artefact = True
+                    artefact_mask[center_y, center_x] = True
         
         if first_right_index_not_smooth != None:
-            if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_right_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(values[x_view//2 + 10]) < abs(data[center_y, center_x])/10):
-                artefact = True
-                artefact_mask[center_y, center_x] = True
+            if first_left_index == None:
+                if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_right_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(values[x_view//2 + 10]) < abs(data[center_y, center_x])/10) and len(mins) < 5:
+                    artefact = True
+                    artefact_mask[center_y, center_x] = True
+            else:
+                if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_right_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(ynew[first_left_index]) < abs(data[center_y, center_x])/10) and len(mins) < 5:
+                    artefact = True
+                    artefact_mask[center_y, center_x] = True
+        
+        if len(mins) < 4:
+            artefact = True
+            artefact_mask[center_y, center_x] = True
+   
         
             
         smoothed_list.append(ynew)
@@ -318,7 +343,7 @@ def lr_min(data, mask, x_view, low = 5, high = 25, s=5):
         first_right_index_list.append(first_right_index)
         artefact_list.append(artefact)
         
-    return artefact_mask, [center_xs, center_ys, smoothed_list, first_left_index_list, first_right_index_list, artefact_list]
+    return artefact_mask, [center_xs, center_ys, smoothed_list, first_left_index_list, first_right_index_list, np.array(artefact_list)], np.array(mins_list)
 
 ## Takes the average intensity of the ring at radius r. Center is the center of the dense core, h = height of data and w = width of data, radius_max is the total size of the circle.
 def check_circular(data, peak_x, peak_y, h, w, radius_max):
