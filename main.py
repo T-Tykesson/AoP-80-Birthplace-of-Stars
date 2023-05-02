@@ -55,6 +55,12 @@ class Classifier:
     def __init__(self, promise_path: str, limits: Tuple, single_slice=True):
 
         self.cutouts = []
+        
+        # For artifical core testing, one sublist for each cutout
+        # [[[Ys], [Xs]], [[Ys], [Xs], ...]]
+        self.art_cores_coords = []
+        self.art_artefacts_coords = []
+        
         self.limits = limits
         self.single_slice = single_slice
 
@@ -70,13 +76,12 @@ class Classifier:
                 for i in tqdm(range(0, int(ymax/yslice_size))):
                     for j in tqdm(range(0, int(xmax/xslice_size))):
                         self.cutouts.append(fits_data["PRIMARY"].data[yslice_size*i : (yslice_size*i+yslice_size), xslice_size*j : (xslice_size*j+xslice_size)])
+                        self.art_cores_coords.append([])
+                        self.art_artefacts_coords.append([])
             else:
                 self.cutouts.append(fits_data["PRIMARY"].data[ limits[0]:limits[1], limits[2]:limits[3] ])
-
-        # For artifical core testing, one sublist for each cutout
-        # [[[Ys], [Xs]], [[Ys], [Xs], ...]]
-        self.art_cores_coords = [[]]
-        self.art_artefacts_coords = [[]]
+                self.art_cores_coords.append([])
+                self.art_artefacts_coords.append([])
 
 
     @plottable(fig_index=1, title="Basic unsharp masking")
@@ -170,15 +175,16 @@ class Classifier:
         radius_list = []
         size = 25
         for i in range(len(rows)):
-            if rows[i] > len(data) - size or cols[i] > len(data[0]) - size or cols[i] - size < 0 or rows[i] - size < 0:
+            if rows[i] > len(data) - (size+1) or cols[i] > len(data[0]) - (size+1) or cols[i] - (size+1) < 0 or rows[i] - (size+1) < 0:
                 #raise ValueError("Invalid input.")
                 radius_list.append(0)
                 continue
-            data_square = data[(rows[i]-size):(rows[i]+size), (cols[i]-size):(cols[i]+size)]
             
-            # Get averages of a circle of values expanding from the peak (TODO: function takes peak coords, this just hardcodes 30),
-            # to a radius of 30. avers is a list of averages indexed by radial pixels from the peak
-            avers = artefacts.check_circular(data_square, size, size, 2*size, 2*size, size-5)
+            data_square = data[(rows[i]-(size)):(rows[i]+size+1), (cols[i]-(size)):(cols[i]+size+1)]
+            
+            # Get averages of a circle of values expanding from the peak,
+            # to a radius of size. avers is a list of averages indexed by radial pixels from the peak
+            avers = artefacts.check_circular(data_square, size, size, 2*size+1, 2*size+1, size-5)
             peak = avers[0]
             base_line = np.min(avers)
             
@@ -202,7 +208,6 @@ class Classifier:
                     break
                 
             if not found_radius:
-                #raise ValueError("Radius could not be found for core", i)
                 radius = 0
                 radius_list.append(0)
 
@@ -267,7 +272,7 @@ class Classifier:
                 y=i[0]
                 x=i[1]
                 size = 101
-                data_square = self.cutouts[0][(y-size):(y+size), (x-size):(x+size)]
+                data_square = self.cutouts[0][(y-size):(y+size+1), (x-size):(x+size+1)]
                 #plt.title(f"Radius:{catalog[1][k]}, Mass:{catalog[2][k]}, Artefact:{catalog[3][k]}")
                 plt.grid(False)
                 plt.imshow(data_square)
@@ -341,10 +346,10 @@ class Classifier:
         artificial_cores = 1000  # Number of artificial cores to insert
         artificial_kernel_size = 15
         intensity_value_art_cores = "Random" #Random intensity value if "Random", write number for fixed intensity
-        artificial_cores_size_min = 5 #min radius
-        artificial_cores_size_max = 25 #max radius
-        artificial_cores_intensity_min = 5 #minimum intensity value  50
-        artificial_cores_intensity_max = 30 #minimum intensity value high 170
+        artificial_cores_size_min = 5 #min kernel size, note this is not the same as the caluclated radius using fwhm
+        artificial_cores_size_max = 25 #max kernel size, note this is not the same as the caluclated radius using fwhm
+        artificial_cores_intensity_min = 5 #minimum intensity value  
+        artificial_cores_intensity_max = 30 #minimum intensity value 
         
         artificial_artefacts = 500 #Number of artificial artefacts to insert
         intensity_value_art_artefacts = "Random" #Random intensity value if "Random", write number for fixed intensity
@@ -353,8 +358,6 @@ class Classifier:
 
         fourier_lp_filter_radius = 500 # Radius of fourier low pass filter
         fourier_absolute_threshold = 0.01 # Absolute threshold of fourier low pass filter
-        
-       
         
         
         if compare:
@@ -398,9 +401,8 @@ class Classifier:
             self.insert_artificial_artefacts(amount=artificial_artefacts, intensity=intensity_value_art_artefacts, int_min=artificial_artefacts_intensity_min, int_max=artificial_artefacts_intensity_max)
             print("Insertion done", "\n")
         current_slice = 0
+        
         for i, slice in enumerate(tqdm(self.cutouts)):
-            
-            
             plot(slice, cmap="hot", norm=colors.Normalize(0, 70))
             
             if not self.single_slice:
@@ -465,6 +467,7 @@ class Classifier:
                 if plot_threshold:
                     threshold_xs, threshold_ys = self.get_threshold_plot_values(processed_data[j], 0.25, 0.75, 0.25, check_bbox_size, min_dist_between_peaks, length, mult, lowest_peak_height)
                     scatter_plot(threshold_xs, threshold_ys)
+                    
                 # Create a mask of only the peaks
                 print("Creating masks of peaks...")
                 start = time.time()
@@ -477,6 +480,7 @@ class Classifier:
                 
                 if plot_images: padded_peaks_mask = definition.pad_mask(peaks_mask, visual_padding)
                 if plot_images: plot(padded_peaks_mask*slice, cmap="hot", norm=colors.Normalize(0, 70), title="Mask", dpi=300)
+                
                 # Test against definition
                 print("Testing against definition...")
                 start = time.time()
@@ -500,7 +504,7 @@ class Classifier:
                 
                 dense_cores_mask = dense_cores_mask & np.logical_not(artefacts_mask)
                 
-                
+
    
                 end = time.time()
                 print("Removing artefacts done")
@@ -528,7 +532,7 @@ class Classifier:
                             if distances[min_index] < 10:
                                 num_found += 1
                     
-                    print(f"Found {num_found}/{len(self.art_cores_coords[i])} inserted cores. ({num_found/len(self.art_cores_coords[i])}%)")
+                    print(f"Found {num_found}/{len(self.art_cores_coords[i])} inserted cores. ({100*num_found/len(self.art_cores_coords[i])}%)")
                     nl = "\n"
                     #print(f"Did not find the following artificial cores:{nl.join(str(c) for c in self.art_cores_coords[i])}")
                 
@@ -545,21 +549,23 @@ class Classifier:
                             if distances[min_index] < 10: #51 size of artificial artefact
                                 num_found_2 += 1
                     
-                    print(f"Found {num_found_2}/{len(self.art_artefacts_coords[i])} inserted artefacts. ({num_found_2/len(self.art_artefacts_coords[i])}%)")
+                    print(f"Found {num_found_2}/{len(self.art_artefacts_coords[i])} inserted artefacts. ({100*num_found_2/len(self.art_artefacts_coords[i])}%)")
                     nl = "\n"
                     #print(f"Did not find the following artificial artefacts:{nl.join(str(c) for c in self.art_artefacts_coords[i])}")
                 
-                radius = self.get_radius(slice, dense_x, dense_y)
-                mass_list = self.get_mass(slice, dense_x, dense_y, radius)
-                scatter_plot(radius, mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log', title=f"Dense cores")
+                print("Calculating mass and radius...")
+                radius = np.array(self.get_radius(slice, dense_x, dense_y), dtype=float)
+                mass_list = np.array(self.get_mass(slice, dense_x, dense_y, radius), dtype=float)*0.0081
+                scatter_plot(radius*0.02, mass_list, xlabel="radie [pc]", ylabel="massa [M$_{\odot}$]", yscale="log", xscale='log', s=1)
                 
                 full_artefact_mask = dense_cores_mask & artefacts_mask
                 radius_and_artefacts = self.get_radius(slice, dense_and_artefacts_x, dense_and_artefacts_y)
                 mass_list_and_artefacts = self.get_mass(slice, dense_and_artefacts_x, dense_and_artefacts_y, radius_and_artefacts)
+                print("Calulating mass and radius done")
                 
                 artefact_flag = []
-                for i in dense_cores_and_artefacts_coordinates:
-                    if i in artefacts_coordinates:
+                for k in dense_cores_and_artefacts_coordinates:
+                    if k in artefacts_coordinates:
                        artefact_flag.append(True) 
                     else:
                         artefact_flag.append(False)      
@@ -568,11 +574,10 @@ class Classifier:
                 if insert_artificial_cores:
                     y = np.array(self.art_cores_coords[0][:, 0], dtype=int)
                     x = np.array(self.art_cores_coords[0][:, 1], dtype=int)
-                    #radius = np.array(self.art_cores_coords[0][:, 3], dtype=int)
-                    art_radius = self.get_radius(slice, y, x)
-    
-                    artificial_mass_list = self.get_mass(slice, y, x, art_radius)
-                    scatter_plot(art_radius, artificial_mass_list, xlabel="radius", ylabel="mass", yscale="log", xscale='log', title="Artificial cores")
+                    art_radius = np.array(self.get_radius(slice, y, x), dtype=float)
+                    
+                    artificial_mass_list = np.array(self.get_mass(slice, y, x, art_radius), dtype=float)*0.0081 #multiplied to get solar masses
+                    scatter_plot(art_radius*0.02, artificial_mass_list, xlabel="radie [pc]", ylabel="massa [M$_{\odot}$]", yscale="log", xscale='log', s=1)
                 
                 if save:
                     print("Saving")
