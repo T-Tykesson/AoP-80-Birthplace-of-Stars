@@ -62,13 +62,14 @@ def test_def(data, peaks_mask, length, mult, lowest_val, remove_len=None, max_di
     
     stds, means, lengths = get_std_from_matrices(matrices, remove_len, max_diff=max_diff, step=step)
     
-    filtered_by_def = np.logical_and(peak_values - means > stds * mult, peak_values - means > lowest_val)
+    counts = np.count_nonzero(matrices == 0, axis=(1,2))
+    filtered_by_def = np.logical_and((peak_values - means) > (stds * mult), (peak_values - means) > lowest_val) & (counts < 1)
     peaks_mask[peak_rows, peak_cols] = filtered_by_def
     
     # def_rows, def_cols = np.where(peaks_mask)
     # print("Test on definition done. From " + str(s) + " to " + str(np.sum(peaks_mask)) + " pixels.")
     # mask[rows,cols] = values > stds * mult
-    return peaks_mask, [peak_rows, peak_cols, filtered_by_def, stds, means, lengths] # peaks_mask
+    return peaks_mask, [peak_rows, peak_cols, filtered_by_def, stds, means, lengths], counts # peaks_mask
 
 # Returns a mask where there is a square with a given length at every 1 in a given mask.
 def pad_mask(mask, length):
@@ -137,7 +138,6 @@ def get_std_from_matrices(matrices, remove_size=None, max_diff=0.1, step=6 ):
         mean_list[std_list == 0] = np.mean(sub_lists[std_list == 0, :], axis=1)
         length_list[std_list == 0] = i
         std_list[std_list == 0] = prev_std_from_sub_lists[std_list == 0]
-        print(std_list == 0)
     
     return std_list, mean_list, length_list
 

@@ -206,7 +206,7 @@ def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, len
     center_xs, center_ys, circ_smoothed_list, circ_smoothed_index_list, avers, circ_artefact_list = circ_artefacts_arr
     
     # Initialize the artefact index
-    artefact_index = np.sum(np.array(range(len(filtered_by_def)))[filtered_by_def] <= index_arr[0]) - 1
+    artefact_index = np.sum(np.array(range(len(filtered_by_def)))[filtered_by_def] <= index_arr[0])
     
     # Loop through all given indexes
     for i in index_arr:
@@ -245,7 +245,7 @@ def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, len
         ax = fig.add_subplot(gs[0, 0])
         ax.imshow(original_data[ystart:yend, xstart:xend], cmap="hot", origin='lower', interpolation="none", norm=colors.Normalize(0, np.max(original_data[ystart:yend, xstart:xend])))
         
-        # Plot a horizontal slice of the processed data around the peak 
+        # Plot a horizontal slice of the processed data around the peak
         ax = fig.add_subplot(gs[0, 1:])
         ax.plot(range((x_view_left - peak_cols[i]), (x_view_right - peak_cols[i])), processed_data[peak_rows[i], x_view_left:x_view_right], '-')
         
@@ -263,7 +263,7 @@ def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, len
                 right_x = right_index + (x_view_left - peak_cols[i] + 1)
                 
                 ax.plot(left_x, left_y, 'o', right_x, right_y, 'o')
-                
+        
         # Plot lines how definition is tested 
         ax.axhline(y = processed_data[peak_rows[i], peak_cols[i]], markersize=6, color="black", linewidth=2, linestyle="dashed")
         ax.axhline(y = means[i], color="black")

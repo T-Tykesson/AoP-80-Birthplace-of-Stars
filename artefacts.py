@@ -311,33 +311,12 @@ def lr_min(data, mask, x_view, low = 8, high = 25, s=0.2):
             if (-high <= first_left_index - x_view - 1 <= -low and low <= first_right_index - x_view - 1 <= high) and (abs(first_right_index - first_left_index) > 5): #and len(mins) < 8 and len(mins_not_smooth) < 8:
                 artefact = True
                 artefact_mask[center_y, center_x] = True
-        
-        if first_left_index_not_smooth != None:
-            if first_right_index == None:
-                if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_left_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(values[x_view//2 - 10]) < abs(data[center_y, center_x])/10) and len(mins) < 5:
-                    artefact = True
-                    artefact_mask[center_y, center_x] = True
-            else:
-                if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_left_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(ynew[first_right_index]) < abs(data[center_y, center_x])/10) and len(mins) < 5:
-                    artefact = True
-                    artefact_mask[center_y, center_x] = True
-        
-        if first_right_index_not_smooth != None:
-            if first_left_index == None:
-                if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_right_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(values[x_view//2 + 10]) < abs(data[center_y, center_x])/10) and len(mins) < 5:
-                    artefact = True
-                    artefact_mask[center_y, center_x] = True
-            else:
-                if ((abs(round(abs(data[center_y, center_x]), 1) - round(abs(values[first_right_index_not_smooth]), 1)) < (abs(data[center_y, center_x])*2/5)) and abs(ynew[first_left_index]) < abs(data[center_y, center_x])/10) and len(mins) < 5:
-                    artefact = True
-                    artefact_mask[center_y, center_x] = True
-        
+
+
         if len(mins) < 4:
             artefact = True
             artefact_mask[center_y, center_x] = True
    
-        
-            
         smoothed_list.append(ynew)
         first_left_index_list.append(first_left_index)
         first_right_index_list.append(first_right_index)
