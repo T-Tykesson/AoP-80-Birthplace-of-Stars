@@ -99,7 +99,7 @@ class Classifier:
         mask = np.zeros(shape)
         center = np.array((shape[0]/2, shape[1]/2))
         
-        m = artificial_cores.create_gaussian_filter(radius)
+        m, _, _ = artificial_cores.create_gaussian_filter(radius)
         m = np.pad(m, ([(shape[0]-radius)//2, (shape[0]-radius)//2],[(shape[1]-radius)//2, (shape[1]-radius)//2]))
         return m
 
@@ -312,27 +312,37 @@ class Classifier:
         return catalog_1
     
     def get_threshold_plot_values(self, processed_data, threshold_min, threshold_max, step, check_bbox_size, min_dist_between_peaks, length, mult, lowest_peak_height):
-        xs = []
-        ys = []
+        xs = []  # Percentage of processed_data that is cut away by the threshold
+        ys = []  # Number of dense cores identified
+        ns = []  # Thresholds
         print("Getting threshold values for plotting...")
         for threshold in np.arange(threshold_max, threshold_min - step, -step):
+            threshold = round(threshold, 2)
             mask = processed_data > threshold
             local_maxes = skimage.feature.peak_local_max(processed_data, min_distance=min_dist_between_peaks, labels = definition.pad_mask(mask, check_bbox_size))
             peaks_mask = np.zeros(processed_data.shape, dtype=bool)
             peaks_mask[local_maxes[:, 0], local_maxes[:, 1]] = True
-            dense_cores_mask, def_plot_arr = definition.test_def(processed_data, peaks_mask, length, mult, lowest_peak_height, step=2, max_diff=0.005)
+            dense_cores_mask, _, _ = definition.test_def(processed_data, peaks_mask, length, mult, lowest_peak_height, step=2, max_diff=0.005)
             
-            xs.append(len(np.where(peaks_mask)[0]))
+            # xs.append(len(np.where(peaks_mask)[0]))
+            xs.append(1 - len(np.where(mask != False)[0]) / len(np.where(processed_data != 0)[0]))
             ys.append(len(np.where(dense_cores_mask)[0]))
-            print("Got: ", xs[-1], " ", ys[-1], "with threshold: ", threshold)
+            ns.append(threshold)
+            print("Got: peaks_mask len: ", xs[-1], "dense_cores_mask_len:", ys[-1], "with threshold: ", threshold, f"percentage cut {1 - len(np.where(mask != False)[0]) / len(np.where(processed_data != 0)[0])}%")
         print("Got threshold values.")
-        return xs, ys
-        
+        fig, ax = plt.subplots()
+        ax.set_xlabel("Percentage cut by threshold")
+        ax.set_ylabel("# Dense cores identified")
+        ax.scatter(xs, ys)
+
+        for i, txt in enumerate(ns):
+            ax.annotate(txt, (xs[i], ys[i]))
+
 
     def run(self, unsharp_mask, wavelet, fourier, plot_images=False, insert_artificial_cores=True, insert_artificial_artefacts=True, save=False, compare=False, merge=False, plot_threshold=False, save_plots_and_images=False): 
         # Definition parameters
         length = 61  # Size of box to expand around peaks when checking against the definition of a d.c.
-        mult = 5 # Factor that peak has to exceed surrounding standard deviation
+        mult = 2 # Factor that peak has to exceed surrounding standard deviation
         lowest_peak_height = 0  # Minimum above surrounding mean value
         check_bbox_size = 3  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
         wavlet_levels = 1  # Number of levels to run wavelet
@@ -356,8 +366,8 @@ class Classifier:
         artificial_artefacts_intensity_min = 25 #minimum intensity value artefacts
         artificial_artefacts_intensity_max = 75 #maximum intensity value artefacts
 
-        fourier_lp_filter_radius = 500 # Radius of fourier low pass filter
-        fourier_absolute_threshold = 0.01 # Absolute threshold of fourier low pass filter
+        fourier_lp_filter_radius = 580 # Radius of fourier low pass filter
+        fourier_absolute_threshold = -99999999 # Absolute threshold of fourier low pass filter
         
         
         if compare:
@@ -465,9 +475,8 @@ class Classifier:
             for j in range(len(processed_data)):
                 plot_graphs_and_images_path = plot_graphs_and_images_paths[j] + str(X_UPPER*current_slice) + "_" + str(X_UPPER*(current_slice+1) - 1) + "/"
                 if plot_threshold:
-                    threshold_xs, threshold_ys = self.get_threshold_plot_values(processed_data[j], 0.25, 0.75, 0.25, check_bbox_size, min_dist_between_peaks, length, mult, lowest_peak_height)
-                    scatter_plot(threshold_xs, threshold_ys)
-                    
+                    self.get_threshold_plot_values(processed_data[j], 0.001, 0.015, 0.001, check_bbox_size, min_dist_between_peaks, length, mult, lowest_peak_height)
+                                        
                 # Create a mask of only the peaks
                 print("Creating masks of peaks...")
                 start = time.time()
@@ -624,13 +633,13 @@ class Classifier:
                     #plot_general((slice, padded_dense_cores), title="Original, Found", norm=colors.Normalize(0, 70), dpi=100)
                  
                
-                if save_plots_and_images:
-                    plot_graphs_and_images(6, 8, 20, processed_data[j], slice, peaks_mask, dense_cores_mask, 50, plot_images=True, title="Classified dense cores", lr_min_artefact=np.array([None]), circ_avg_min_artefact=np.array([None]), avg_graph=np.array([None]), mins_list=mins_list[(circ_avg_min_plot_arr[5] == False) & (lr_min_plot_arr[5] == False)], path=(plot_graphs_and_images_path + "dense_cores/"), plot=False)
-                    plot_graphs_and_images(8, 8, 20, processed_data[j], slice, dense_cores_mask | circ_avg_min_mask | lr_min_mask, circ_avg_min_mask | lr_min_mask, 50, plot_images=True, title="Classified artefacts", lr_min_artefact=lr_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], circ_avg_min_artefact=circ_avg_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], avg_graph=circ_avg_min_plot_arr[4][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], mins_list=mins_list[(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], path=(plot_graphs_and_images_path + "artefacts/"), plot=False)
-                else:
-                    plot_graphs_and_images(6, 8, 10, processed_data[j], slice, peaks_mask, dense_cores_mask, 50, plot_images=True, title="Classified dense cores", lr_min_artefact=np.array([None]), circ_avg_min_artefact=np.array([None]), avg_graph=np.array([None]), plot=True, mins_list=counts[def_plot_arr[2]][(circ_avg_min_plot_arr[5] == False) & (lr_min_plot_arr[5] == False)])
-                    plot_graphs_and_images(8, 8, 30, processed_data[j], slice, dense_cores_mask | circ_avg_min_mask | lr_min_mask, circ_avg_min_mask | lr_min_mask, 100, plot_images=True, title="Classified artefacts ", lr_min_artefact=lr_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], circ_avg_min_artefact=circ_avg_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], avg_graph=circ_avg_min_plot_arr[4][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], mins_list=mins_list[(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], plot=True)
-                   
+                    if save_plots_and_images:
+                        plot_graphs_and_images(6, 8, 20, processed_data[j], slice, peaks_mask, dense_cores_mask, 50, plot_images=True, title="Classified dense cores", lr_min_artefact=np.array([None]), circ_avg_min_artefact=np.array([None]), avg_graph=np.array([None]), mins_list=mins_list[(circ_avg_min_plot_arr[5] == False) & (lr_min_plot_arr[5] == False)], path=(plot_graphs_and_images_path + "dense_cores/"), plot=False)
+                        plot_graphs_and_images(8, 8, 20, processed_data[j], slice, dense_cores_mask | circ_avg_min_mask | lr_min_mask, circ_avg_min_mask | lr_min_mask, 50, plot_images=True, title="Classified artefacts", lr_min_artefact=lr_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], circ_avg_min_artefact=circ_avg_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], avg_graph=circ_avg_min_plot_arr[4][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], mins_list=mins_list[(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], path=(plot_graphs_and_images_path + "artefacts/"), plot=False)
+                    else:
+                        plot_graphs_and_images(6, 8, 10, processed_data[j], slice, peaks_mask, dense_cores_mask, 50, plot_images=True, title="Classified dense cores", lr_min_artefact=np.array([None]), circ_avg_min_artefact=np.array([None]), avg_graph=np.array([None]), plot=True, mins_list=counts[def_plot_arr[2]][(circ_avg_min_plot_arr[5] == False) & (lr_min_plot_arr[5] == False)])
+                        plot_graphs_and_images(8, 8, 30, processed_data[j], slice, dense_cores_mask | circ_avg_min_mask | lr_min_mask, circ_avg_min_mask | lr_min_mask, 100, plot_images=True, title="Classified artefacts ", lr_min_artefact=lr_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], circ_avg_min_artefact=circ_avg_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], avg_graph=circ_avg_min_plot_arr[4][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], mins_list=mins_list[(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], plot=True)
+                    
                 #artefact_rows, artefact_cols = np.where(lr_min_mask | circ_avg_min_mask)
                 #for j in range(len(artefact_rows)):
                 #    plot(slice[(artefact_rows[j] - 25):(artefact_rows[j] + 25), (artefact_cols[j] - 25):(artefact_cols[j] + 25)], cmap="hot")
@@ -651,12 +660,24 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = ""
+    src_path = "src_data/Q1-latest-whigal-85.fits"
     catalog_folder_path = ""
 
-    X_LOWER, X_UPPER = 0_000, 12_000
-    Y_LOWER, Y_UPPER = 0, 7_000
+    X_LOWER, X_UPPER = 4_000, 6_000
+    Y_LOWER, Y_UPPER = 3_000, 5_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER], single_slice=True)
-    sc.run(True, False, False, insert_artificial_cores=False, insert_artificial_artefacts=False, save=False, compare=False, merge=False, save_plots_and_images=False)
-
+    run_params = {
+        "unsharp_mask": False,
+        "wavelet": False,
+        "fourier": True,
+        "insert_artificial_cores": False, 
+        "insert_artificial_artefacts": False,
+        "save": False, 
+        "compare": False, 
+        "merge": False, 
+        "save_plots_and_images": False,
+        "plot_threshold": True,
+        "plot_images": False
+    }
+    sc.run(**run_params)
