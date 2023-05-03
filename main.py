@@ -99,7 +99,7 @@ class Classifier:
         mask = np.zeros(shape)
         center = np.array((shape[0]/2, shape[1]/2))
         
-        m = artificial_cores.create_gaussian_filter(radius)
+        m, _, _ = artificial_cores.create_gaussian_filter(radius)
         m = np.pad(m, ([(shape[0]-radius)//2, (shape[0]-radius)//2],[(shape[1]-radius)//2, (shape[1]-radius)//2]))
         return m
 
@@ -306,11 +306,67 @@ class Classifier:
                 plt.imshow(data_square)
                 plt.show()
                 #k += 1
-                
-    def merge_catalog(self, catalog_1, catalog_2):
-        catalog_1[1] = np.hstack((catalog_1[1], catalog_2[1]))
-        return catalog_1
     
+    def merge_catalogs(self, catalog_1, catalog_2):
+        merged_catalog = np.zeros((len(catalog_1), len(catalog_1[0]) + len(catalog_2[0])))
+        merged_catalog_index = 0
+        catalog_1_index = 0
+        catalog_2_index = 0
+        while(merged_catalog_index < len(merged_catalog[0])):
+            
+            if catalog_1_index < len(catalog_1[0]):
+                x_1 = int(np.round(catalog_1[1][catalog_1_index] / 10))
+                y_1 = int(np.round(catalog_1[2][catalog_1_index] / 10))
+                pos_1 = x_1 + y_1 * (self.limits[3] - self.limits[2])
+            
+            if catalog_2_index < len(catalog_2[0]):
+                x_2 = int(np.round(catalog_2[1][catalog_2_index] / 10))
+                y_2 =int(np.round(catalog_2[2][catalog_2_index] / 10))
+            
+                pos_2 = x_2 + y_2 * (self.limits[3] - self.limits[2])
+
+            if (pos_1 < pos_2 or catalog_2_index >= len(catalog_2[0])) and catalog_1_index < len(catalog_1[0]):
+                merged_catalog[:, merged_catalog_index] = catalog_1[:, catalog_1_index]
+                merged_catalog_index += 1
+                catalog_1_index += 1
+            elif ((pos_1 > pos_2) or catalog_1_index >= len(catalog_1[0])) and catalog_2_index < len(catalog_2[0]): 
+                merged_catalog[:, merged_catalog_index] = catalog_2[:, catalog_2_index]
+                merged_catalog_index += 1
+                catalog_2_index += 1
+            elif catalog_1_index < len(catalog_1[0]) and catalog_2_index < len(catalog_2[0]):
+                merged_catalog[:, merged_catalog_index] = catalog_1[:, catalog_1_index]
+                merged_catalog[5:8, merged_catalog_index] = np.array(catalog_1[5:8, catalog_1_index], dtype=bool) | np.array(catalog_2[5:8, catalog_2_index], dtype=bool)
+                merged_catalog[8:11, merged_catalog_index] = np.array(catalog_1[8:11, catalog_1_index], dtype=bool) | np.array(catalog_2[8:11, catalog_2_index], dtype=bool)
+                #if catalog_1[catalog_1_index, 3] == catalog_2[catalog_2_index, 3]:
+                #    print("Different radius!")
+                merged_catalog_index += 1
+                catalog_1_index += 1
+                catalog_2_index += 1
+            else:
+                break
+        
+        merged_catalog = merged_catalog[:, :merged_catalog_index]
+        merged_catalog[0, :] = range(0, len(merged_catalog[0]))
+        return merged_catalog
+    
+    def merge_catalogs_of_same_method(self, slices_path, amount):
+            
+
+        merge_path = slices_path
+        
+        path_1 = merge_path + str(X_UPPER*0) + "_" + str(X_UPPER*(0+1) - 1) + "/" + str(X_UPPER*0) + "_" + str(X_UPPER*(0+1) - 1) + ".npy"
+        path_2 = merge_path + str(X_UPPER*(0+1)) + "_" + str(X_UPPER*(0+2) - 1) + "/" + str(X_UPPER*(0+1)) + "_" + str(X_UPPER*(0+2) - 1) + ".npy"
+        catalog_1 = np.load(path_1)
+        catalog_2 = np.load(path_2)
+        merged = self.merge_catalogs(catalog_1, catalog_2)
+        
+        for i in range(2, amount):
+            path = merge_path + str(X_UPPER*(i)) + "_" + str(X_UPPER*(i+1) - 1) + "/" + str(X_UPPER*(i)) + "_" + str(X_UPPER*(i+1) - 1) + ".npy"
+            catalog = np.load(path)
+            merged = self.merge_catalogs(merged, catalog)
+        
+        return merged
+                
     def get_threshold_plot_values(self, processed_data, threshold_min, threshold_max, step, check_bbox_size, min_dist_between_peaks, length, mult, lowest_peak_height):
         xs = []
         ys = []
@@ -328,19 +384,55 @@ class Classifier:
         print("Got threshold values.")
         return xs, ys
         
+    def catalog_to_text(self, catalog):
+        
+        text_catalog = np.copy(catalog)
+        text_catalog[3] = np.round(text_catalog[3])
+        text_catalog[4] = np.round(text_catalog[4], 2)
+        
+        text_catalog = np.array(text_catalog[:7, :], dtype=str)
+        
+        artefact_unsh_mask = np.array(catalog[5, :], dtype=bool)
+        artefact_wavelet_mask = np.array(catalog[6, :], dtype=bool)
+        artefact_fourier_mask = np.array(catalog[7, :], dtype=bool)
+        
+        text_catalog[5, :] = ""
+        text_catalog[5, artefact_unsh_mask] = np.array([str(x) + "Unsharp_mask " for x in text_catalog[5, artefact_unsh_mask]])
+        text_catalog[5, artefact_wavelet_mask] = np.array([str(x) + "Wavelet " for x in text_catalog[5, artefact_wavelet_mask]])
+        text_catalog[5, artefact_fourier_mask] = np.array([str(x) + "Fourier " for x in text_catalog[5, artefact_fourier_mask]])
+        text_catalog[5, np.logical_not(artefact_unsh_mask) & np.logical_not(artefact_wavelet_mask) & np.logical_not(artefact_fourier_mask)] = np.array([str(x) + "-" for x in text_catalog[5, np.logical_not(artefact_fourier_mask) & np.logical_not(artefact_unsh_mask) & np.logical_not(artefact_wavelet_mask)]])
+        
+        unsh_mask = np.array(catalog[8, :], dtype=bool)
+        wavelet_mask = np.array(catalog[9, :], dtype=bool)
+        fourier_mask = np.array(catalog[10, :], dtype=bool)
+        
+        text_catalog[6, :] = ""
+        text_catalog[6, unsh_mask] = np.array([str(x) + "Unsharp_mask " for x in text_catalog[6, unsh_mask]])
+        text_catalog[6, wavelet_mask] = np.array([str(x) + "Wavelet " for x in text_catalog[6, wavelet_mask]])
+        text_catalog[6, fourier_mask] = np.array([str(x) + "Fourier " for x in text_catalog[6, fourier_mask]])
+        
+        text_catalog = np.hstack([[[""], [""], [""], [""], [""], [""], [""]], text_catalog])
+        text_catalog = np.hstack([[["Index"], ["X"], ["Y"], ["Radius"], ["Mass"], ["Artefact"], ["Method"]], text_catalog])
+        text_catalog[3][text_catalog[3] == "0.0"] = "-"
+        text_catalog[4][text_catalog[4] == "0.0"] = "-"
+        text_catalog = np.transpose(text_catalog)
+        
+        
+        return text_catalog
+    
 
-    def run(self, unsharp_mask, wavelet, fourier, plot_images=False, insert_artificial_cores=True, insert_artificial_artefacts=True, save=False, compare=False, merge=False, plot_threshold=False, save_plots_and_images=False): 
+    def run(self, unsharp_mask, wavelet, fourier, plot_images=False, insert_artificial_cores=True, insert_artificial_artefacts=True, save=False, compare=False, merge=False, plot_threshold=False, save_plots_and_images=False, show_plots_and_images=False): 
         # Definition parameters
         length = 61  # Size of box to expand around peaks when checking against the definition of a d.c.
         mult = 5 # Factor that peak has to exceed surrounding standard deviation
         lowest_peak_height = 0  # Minimum above surrounding mean value
         check_bbox_size = 3  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
         wavlet_levels = 1  # Number of levels to run wavelet
-        wavelet_absolute_threshold = 0.5 # Aboslute mimimum of the summed wavlet peaks
+        wavelet_absolute_threshold = 2 # Aboslute mimimum of the summed wavlet peaks
         min_dist_between_peaks = 5  # Minimum number of pixels required between each peak
         visual_padding = 51  # Padding around indetified peaks to be shown when plotting
         
-        unsh_mask_absolute_threshold = 0.1  # Aboslute mimimum of the unsharp mask
+        unsh_mask_absolute_threshold = 2  # Aboslute mimimum of the unsharp mask
         unsh_mask_sigma = 1 # Sigma of unsharp mask
         
         artificial_cores = 1000  # Number of artificial cores to insert
@@ -356,8 +448,8 @@ class Classifier:
         artificial_artefacts_intensity_min = 25 #minimum intensity value artefacts
         artificial_artefacts_intensity_max = 75 #maximum intensity value artefacts
 
-        fourier_lp_filter_radius = 500 # Radius of fourier low pass filter
-        fourier_absolute_threshold = 0.01 # Absolute threshold of fourier low pass filter
+        fourier_lp_filter_radius = 100 # Radius of fourier low pass filter
+        fourier_absolute_threshold = 2 # Absolute threshold of fourier low pass filter
         
         
         if compare:
@@ -375,22 +467,36 @@ class Classifier:
             self.check_in_1_not_2(catalog_2[1], catalog_1[1], pixel_perfect=False, plot=False, name="catalog 2")
             return None
         
-        if merge:
-            # First element of catalog is info, info is perserved in merge
-            catalog_1 = np.load("test.npy", allow_pickle=True)
-            catalog_2 = np.load("test2.npy",allow_pickle=True)
-            #catalog_3 = np.load("test3.npy",allow_pickle=True)
-            #catalog_4 = np.load("test4.npy",allow_pickle=True)
-            merged = self.merge_catalog(catalog_1, catalog_2)
-            #merged_2 = self.merge_catalog(catalog_3, catalog_4)
-            #merged_tot = self.merge_catalog(merged, catalog_4)
+        if merge > 0:
+            
+            print("Creating merged file...")
+            merge_path = catalog_folder_path + str(mult) + "/"
+            merges = []
+            if unsharp_mask:
+                merges.append(self.merge_catalogs_of_same_method(merge_path + "unsharp_mask/" + str(unsh_mask_absolute_threshold) + "/", merge))
+            
+            if wavelet:
+                merges.append(self.merge_catalogs_of_same_method(merge_path + "wavelet/" + str(wavelet_absolute_threshold) + "/", merge))
+            
+            if fourier:
+                merges.append(self.merge_catalogs_of_same_method(merge_path + "fourier/" + str(fourier_absolute_threshold) + "/", merge))
+            
+            merged_catalog = merges[0]
+            if len(merges) >= 2:
+                merged_catalog = self.merge_catalogs(merged_catalog, merges[1])
+            
+            if len(merges) == 3:
+                merged_catalog = self.merge_catalogs(merged_catalog, merges[2])
+            
+            merged_catalog_text = self.catalog_to_text(merged_catalog)
+            print("Merged file done.")
             
             print("Saving merge")
-            file_name = "Merged catalog" #Name of merged catalog
-            np.save(file_name, merged)
+            np.savetxt(merge_path + "test.txt", merged_catalog_text, fmt='%-20s')
+            np.save(merge_path + "test.npy", merged_catalog)
             print("Saved merge")
-            return None
             
+            return None
         if insert_artificial_cores:
             print("Inserting artificial cores")
             #self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
@@ -417,6 +523,7 @@ class Classifier:
             plot_graphs_and_images_paths = []
             
             # Calculate unsharp mask
+            methods_list = []
             if unsharp_mask:
                 print("\n", "Creating unsharp mask")
                 start = time.time()
@@ -425,9 +532,10 @@ class Classifier:
                 processed_data.append(unsh)
                 masks.append(unsh_mask)
                 end = time.time()
+                methods_list.append("unsharp_mask")
                 
                 parameter_info = f"Unsharp mask, absolute threshold = {unsh_mask_absolute_threshold}, sigma = {unsh_mask_sigma}, Other parameters: length={length}, mult={mult}, lowest_peak_height={lowest_peak_height}, check_bbox_size={check_bbox_size}, min_dist_between_peaks={min_dist_between_peaks}" 
-                plot_graphs_and_images_paths.append(catalog_folder_path + "unsharp_mask/" + str(mult) + "/" + str(wavelet_absolute_threshold) + "/")
+                plot_graphs_and_images_paths.append(catalog_folder_path + str(mult) + "/unsharp_mask/" + str(unsh_mask_absolute_threshold) + "/")
                 print("Creating unsharp mask done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")  
 
@@ -438,7 +546,7 @@ class Classifier:
                 start = time.time()
                 w = Classifier.discrete_2d_wavelet(slice, wavlet_levels)
                 w_sums = w[1][0] + w[1][1] + w[1][2]  # Sum the horizontal, vertical, and diagonal return values
-    
+                methods_list.append("wavelet")
                 # Resize summed wavelet and calculate mask
                 w_sums = skimage.transform.resize(w_sums, slice.shape)
                 w_mask = w_sums > wavelet_absolute_threshold
@@ -446,7 +554,7 @@ class Classifier:
                 masks.append(w_mask)
                 
                 parameter_info = f"Wavelet, wavlet_levels = {wavlet_levels}, wavelet_absolute_threshold = {wavelet_absolute_threshold}, Other parameters: length={length}, mult={mult}, lowest_peak_height={lowest_peak_height}, check_bbox_size={check_bbox_size }, min_dist_between_peaks={min_dist_between_peaks}" 
-                plot_graphs_and_images_paths.append(catalog_folder_path + "wavelet/" + str(mult) + "/" + str(wavelet_absolute_threshold) + "/")
+                plot_graphs_and_images_paths.append(catalog_folder_path + str(mult) + "/wavelet/" + str(wavelet_absolute_threshold) + "/")
                 
                 #plot(definition.pad_mask(w_mask, 51)*slice, cmap="hot", norm=colors.Normalize(0, 70), title="Defined dense cores", dpi=300)
                 end = time.time()
@@ -458,9 +566,10 @@ class Classifier:
                 f = self.low_pass_filter_fourier(slice, lp_filter_radius=fourier_lp_filter_radius)
                 processed_data.append(slice - f)
                 masks.append((slice - f) > fourier_absolute_threshold)
-                plot_graphs_and_images_paths.append(catalog_folder_path + "fourier/" + str(mult) + "/" + str(wavelet_absolute_threshold) + "/")
+                plot_graphs_and_images_paths.append(catalog_folder_path + str(mult) + "/fourier/" + str(fourier_absolute_threshold) + "/")
                 print("fourier done")
                 plot(f, norm=colors.Normalize(0, 160), cmap="hot")
+                methods_list.append("fourier")
             
             for j in range(len(processed_data)):
                 plot_graphs_and_images_path = plot_graphs_and_images_paths[j] + str(X_UPPER*current_slice) + "_" + str(X_UPPER*(current_slice+1) - 1) + "/"
@@ -504,8 +613,6 @@ class Classifier:
                 
                 dense_cores_mask = dense_cores_mask & np.logical_not(artefacts_mask)
                 
-
-   
                 end = time.time()
                 print("Removing artefacts done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
@@ -552,7 +659,7 @@ class Classifier:
                     print(f"Found {num_found_2}/{len(self.art_artefacts_coords[i])} inserted artefacts. ({100*num_found_2/len(self.art_artefacts_coords[i])}%)")
                     nl = "\n"
                     #print(f"Did not find the following artificial artefacts:{nl.join(str(c) for c in self.art_artefacts_coords[i])}")
-                
+                 
                 print("Calculating mass and radius...")
                 radius = np.array(self.get_radius(slice, dense_x, dense_y), dtype=float)
                 mass_list = np.array(self.get_mass(slice, dense_x, dense_y, radius), dtype=float)*0.0081
@@ -585,10 +692,16 @@ class Classifier:
                     #catalog np.array([dense_cores_coordinates, radius, mass_list], dtype=object)
                     #catalog = np.array([list(zip(dense_and_artefacts_x_compensated, dense_and_artefacts_y)), radius_and_artefacts, mass_list_and_artefacts, artefact_flag], dtype=object)
                     radius_and_artefacts = np.array(radius_and_artefacts, dtype=int)
-                    catalog = np.array([np.array(range(0, len(dense_and_artefacts_x_compensated)), dtype=np.str), dense_and_artefacts_x_compensated, dense_and_artefacts_y, radius_and_artefacts, mass_list_and_artefacts, artefact_flag], dtype=np.str)
-                    catalog = np.hstack([[["Index"], ["X"], ["Y"], ["Radius"], ["Mass"], ["Is artefact"]], np.array(catalog,dtype=np.str)])
                     
-                
+                    if methods_list[j] == "unsharp_mask":
+                        catalog = np.array([np.array(range(0, len(dense_and_artefacts_x_compensated))), dense_and_artefacts_x_compensated, dense_and_artefacts_y, radius_and_artefacts, mass_list_and_artefacts, artefact_flag, np.array([False]*len(artefact_flag), dtype=bool), np.array([False]*len(artefact_flag), dtype=bool), np.array([True]*len(artefact_flag), dtype=bool), np.array([False]*len(artefact_flag), dtype=bool), np.array([False]*len(artefact_flag), dtype=bool)])
+                    if methods_list[j] == "wavelet":
+                        catalog = np.array([np.array(range(0, len(dense_and_artefacts_x_compensated))), dense_and_artefacts_x_compensated, dense_and_artefacts_y, radius_and_artefacts, mass_list_and_artefacts, np.array([False]*len(artefact_flag), dtype=bool), artefact_flag, np.array([False]*len(artefact_flag), dtype=bool), np.array([False]*len(artefact_flag), dtype=bool), np.array([True]*len(artefact_flag), dtype=bool), np.array([False]*len(artefact_flag), dtype=bool)])
+                    if methods_list[j] == "fourier":
+                        catalog = np.array([np.array(range(0, len(dense_and_artefacts_x_compensated))), dense_and_artefacts_x_compensated, dense_and_artefacts_y, radius_and_artefacts, mass_list_and_artefacts, np.array([False]*len(artefact_flag), dtype=bool), np.array([False]*len(artefact_flag), dtype=bool), artefact_flag, np.array([False]*len(artefact_flag), dtype=bool), np.array([False]*len(artefact_flag), dtype=bool), np.array([1]*len(artefact_flag), dtype=bool)])
+                    #text_catalog = np.copy(catalog)
+                    #text_catalog = np.hstack([[["Index"], ["X"], ["Y"], ["Radius"], ["Mass"], ["Is artefact"]], np.array(text_catalog,dtype=np.str)])
+                    
                     if insert_artificial_cores and insert_artificial_artefacts:
                         performance = f"Artificial cores percentage:{num_found}, arificial artefacts percentage:{num_found_2}"
                         save_file = np.array([parameter_info, performance, catalog], dtype=object)
@@ -598,11 +711,10 @@ class Classifier:
                     elif insert_artificial_cores:
                         performance = f"Artificial cores percentage:{num_found},"
                         save_file = np.array([parameter_info, performance, catalog], dtype=object)
-                    else:
-                        save_file = np.array(catalog)
+       
                     Path(plot_graphs_and_images_path).mkdir(parents=True, exist_ok=True)
-                    np.save(plot_graphs_and_images_path + file_name, save_file)
-                    np.savetxt(plot_graphs_and_images_path + file_name + ".txt", np.transpose(save_file), fmt='%-10s')
+                    np.save(plot_graphs_and_images_path + file_name, catalog)
+                    #np.savetxt(plot_graphs_and_images_path + file_name + ".txt", np.transpose(text_catalog), fmt='%-10s')
                     print("Saved")
                 
                 # Get data to plot
@@ -627,14 +739,14 @@ class Classifier:
                 if save_plots_and_images:
                     plot_graphs_and_images(6, 8, 20, processed_data[j], slice, peaks_mask, dense_cores_mask, 50, plot_images=True, title="Classified dense cores", lr_min_artefact=np.array([None]), circ_avg_min_artefact=np.array([None]), avg_graph=np.array([None]), mins_list=mins_list[(circ_avg_min_plot_arr[5] == False) & (lr_min_plot_arr[5] == False)], path=(plot_graphs_and_images_path + "dense_cores/"), plot=False)
                     plot_graphs_and_images(8, 8, 20, processed_data[j], slice, dense_cores_mask | circ_avg_min_mask | lr_min_mask, circ_avg_min_mask | lr_min_mask, 50, plot_images=True, title="Classified artefacts", lr_min_artefact=lr_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], circ_avg_min_artefact=circ_avg_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], avg_graph=circ_avg_min_plot_arr[4][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], mins_list=mins_list[(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], path=(plot_graphs_and_images_path + "artefacts/"), plot=False)
-                else:
+                elif show_plots_and_images:
                     plot_graphs_and_images(6, 8, 10, processed_data[j], slice, peaks_mask, dense_cores_mask, 50, plot_images=True, title="Classified dense cores", lr_min_artefact=np.array([None]), circ_avg_min_artefact=np.array([None]), avg_graph=np.array([None]), plot=True, mins_list=counts[def_plot_arr[2]][(circ_avg_min_plot_arr[5] == False) & (lr_min_plot_arr[5] == False)])
                     plot_graphs_and_images(8, 8, 30, processed_data[j], slice, dense_cores_mask | circ_avg_min_mask | lr_min_mask, circ_avg_min_mask | lr_min_mask, 100, plot_images=True, title="Classified artefacts ", lr_min_artefact=lr_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], circ_avg_min_artefact=circ_avg_min_plot_arr[5][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], avg_graph=circ_avg_min_plot_arr[4][(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], mins_list=mins_list[(circ_avg_min_plot_arr[5] == True) | (lr_min_plot_arr[5] == True)], plot=True)
                    
                 #artefact_rows, artefact_cols = np.where(lr_min_mask | circ_avg_min_mask)
                 #for j in range(len(artefact_rows)):
                 #    plot(slice[(artefact_rows[j] - 25):(artefact_rows[j] + 25), (artefact_cols[j] - 25):(artefact_cols[j] + 25)], cmap="hot")
-                    
+            
             """
             # Lowpass Example
             for r in tqdm([5, 30, 60]):
@@ -646,8 +758,6 @@ class Classifier:
             current_slice += 1
             print(current_slice)
         
-        
-            
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
@@ -655,8 +765,8 @@ if __name__ == "__main__":
     catalog_folder_path = ""
 
     X_LOWER, X_UPPER = 0_000, 12_000
-    Y_LOWER, Y_UPPER = 0, 7_000
+    Y_LOWER, Y_UPPER = 0_000, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER], single_slice=True)
-    sc.run(True, False, False, insert_artificial_cores=False, insert_artificial_artefacts=False, save=False, compare=False, merge=False, save_plots_and_images=False)
+    sc.run(True, False, False, insert_artificial_cores=False, insert_artificial_artefacts=False, save=False, compare=False, merge=0, save_plots_and_images=False)
 
