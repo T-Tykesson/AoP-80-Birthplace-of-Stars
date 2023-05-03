@@ -174,6 +174,7 @@ class Classifier:
     def get_radius(self, data, rows, cols):
         radius_list = []
         size = 25
+        k = 0
         for i in range(len(rows)):
             if rows[i] > len(data) - (size+1) or cols[i] > len(data[0]) - (size+1) or cols[i] - (size+1) < 0 or rows[i] - (size+1) < 0:
                 #raise ValueError("Invalid input.")
@@ -194,7 +195,7 @@ class Classifier:
             # Smooth this curve further by interpolating the values by a factor of 100
             x2 = range(len(avers))
             y2 = avers #interpolate.splev(x2, spl)
-            
+         
             
             
             # Traverse through the averages finding the first average to <= half the peak value
@@ -210,13 +211,56 @@ class Classifier:
             if not found_radius:
                 radius = 0
                 radius_list.append(0)
-
-        return radius_list
-            #if radius > 20:
+            
+            #if 0 < radius < 10:
             #    plt.title(f"Plotting dense core if radius greater than 20, radius: {radius}")
             #    plt.imshow(data_square)
             #    plt.show()
+            #    k += 1
+            #    fig, (ax1, ax2) = plt.subplots(1, 2)
+            #    fig.set_size_inches(18,7)
+            #    fig.set_dpi(300)
+                #fig.suptitle('Horizontally stacked subplots')
+                #ax1.set_title(f"Radie: {radius} [pixlar]")
+            #    ax1.set(xlabel='pixlar', ylabel='pixlar')
+            #    ax1.imshow(data_square)
+            #    ax1.imshow(data_square)
+            #    ax1.grid(alpha=0.5)
+            #    radius = round(radius)
+            #    ax2.set_title(f"Beräknat radievärde: {radius} [pixlar]")
+            #    ax2.set(xlabel='radiell förflyttning från centrum [pixlar]', ylabel='Intensitetsmedelvärde [M$_{\odot}$]')
+            #    y2 = y2*0.0081
+            #    ax2.plot(x2, y2)
+            #    half_max = np.ones(len(x2))*(peak + base_line)/2*0.0081
+            #    radius_function = np.ones(len(x2))*radius
+            #    ax2.plot(x2, half_max, "r")
+            #    ax2.plot(radius_function, y2,'--')
+            #    plt.show(fig)
+                #plt.clf()
+                #fig = plt.figure()
+                #plt.title(f"Plotting dense core if radius greater than 25, radius: {radius}")
+                #plt.imshow(data_square)
+                #plt.show()
+                #fig2 = plt.figure()
+                #plt.title(f"Radie {radius}")
+                #plt.plot(x2, y2)
+                #half_max = np.ones(len(x2))*peak/2
+                #radius_function = np.ones(len(x2))*radius
+                #plt.plot(x2, half_max, "r")
+                #plt.plot(radius_function, y2,'--')
+                #plt.grid(False)
+                #plt.show()
+                #plt.title(f"US: Plotting dense core if radius greater than 20, radius: {radius}")
+                #plt.imshow(us_data_square)
+                #plt.show()
+                
+       
+                #plt.show()
+        print("Found cores over 20:", k)
+        print("Cores not found:", len(radius_list) - np. count_nonzero(radius_list))
 
+        return radius_list
+            
 
     def plot_cores_from_catalog(self, catalog):
         k = 0
@@ -368,21 +412,33 @@ class Classifier:
         return merged
                 
     def get_threshold_plot_values(self, processed_data, threshold_min, threshold_max, step, check_bbox_size, min_dist_between_peaks, length, mult, lowest_peak_height):
-        xs = []
-        ys = []
+        xs = []  # Percentage of processed_data that is cut away by the threshold
+        ys = []  # Number of dense cores identified
+        ns = []  # Thresholds
         print("Getting threshold values for plotting...")
         for threshold in np.arange(threshold_max, threshold_min - step, -step):
+            threshold = round(threshold, 2)
             mask = processed_data > threshold
             local_maxes = skimage.feature.peak_local_max(processed_data, min_distance=min_dist_between_peaks, labels = definition.pad_mask(mask, check_bbox_size))
             peaks_mask = np.zeros(processed_data.shape, dtype=bool)
             peaks_mask[local_maxes[:, 0], local_maxes[:, 1]] = True
-            dense_cores_mask, def_plot_arr = definition.test_def(processed_data, peaks_mask, length, mult, lowest_peak_height, step=2, max_diff=0.005)
+            dense_cores_mask, _, _ = definition.test_def(processed_data, peaks_mask, length, mult, lowest_peak_height, step=2, max_diff=0.005)
             
-            xs.append(len(np.where(peaks_mask)[0]))
+            # xs.append(len(np.where(peaks_mask)[0]))
+            xs.append(1 - len(np.where(mask != False)[0]) / len(np.where(processed_data != 0)[0]))
             ys.append(len(np.where(dense_cores_mask)[0]))
-            print("Got: ", xs[-1], " ", ys[-1], "with threshold: ", threshold)
+            ns.append(threshold)
+            print("Got: peaks_mask len: ", xs[-1], "dense_cores_mask_len:", ys[-1], "with threshold: ", threshold, f"percentage cut {1 - len(np.where(mask != False)[0]) / len(np.where(processed_data != 0)[0])}%")
         print("Got threshold values.")
-        return xs, ys
+
+        fig, ax = plt.subplots()
+        ax.set_xlabel("Percentage cut by threshold")
+        ax.set_ylabel("# Dense cores identified")
+        ax.scatter(xs, ys)
+
+        for i, txt in enumerate(ns):
+            ax.annotate(txt, (xs[i], ys[i]))
+        #return xs, ys
         
     def catalog_to_text(self, catalog):
         
@@ -421,10 +477,12 @@ class Classifier:
         return text_catalog
     
 
+
+
     def run(self, unsharp_mask, wavelet, fourier, plot_images=False, insert_artificial_cores=True, insert_artificial_artefacts=True, save=False, compare=False, merge=False, plot_threshold=False, save_plots_and_images=False, show_plots_and_images=False): 
         # Definition parameters
         length = 61  # Size of box to expand around peaks when checking against the definition of a d.c.
-        mult = 5 # Factor that peak has to exceed surrounding standard deviation
+        mult = 2 # Factor that peak has to exceed surrounding standard deviation
         lowest_peak_height = 0  # Minimum above surrounding mean value
         check_bbox_size = 3  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
         wavlet_levels = 1  # Number of levels to run wavelet
@@ -574,9 +632,8 @@ class Classifier:
             for j in range(len(processed_data)):
                 plot_graphs_and_images_path = plot_graphs_and_images_paths[j] + str(X_UPPER*current_slice) + "_" + str(X_UPPER*(current_slice+1) - 1) + "/"
                 if plot_threshold:
-                    threshold_xs, threshold_ys = self.get_threshold_plot_values(processed_data[j], 0.25, 0.75, 0.25, check_bbox_size, min_dist_between_peaks, length, mult, lowest_peak_height)
-                    scatter_plot(threshold_xs, threshold_ys)
-                    
+                    self.get_threshold_plot_values(processed_data[j], 0.001, 0.015, 0.001, check_bbox_size, min_dist_between_peaks, length, mult, lowest_peak_height)
+                                        
                 # Create a mask of only the peaks
                 print("Creating masks of peaks...")
                 start = time.time()
@@ -667,7 +724,8 @@ class Classifier:
                 
                 full_artefact_mask = dense_cores_mask & artefacts_mask
                 radius_and_artefacts = self.get_radius(slice, dense_and_artefacts_x, dense_and_artefacts_y)
-                mass_list_and_artefacts = self.get_mass(slice, dense_and_artefacts_x, dense_and_artefacts_y, radius_and_artefacts)
+                mass_list_and_artefacts = np.array(self.get_mass(slice, dense_and_artefacts_x, dense_and_artefacts_y, radius_and_artefacts))*0.0081
+                radius_and_artefacts = np.array(radius_and_artefacts, dtype=float)*0.02
                 print("Calulating mass and radius done")
                 
                 artefact_flag = []
@@ -761,12 +819,24 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = ""
+    src_path = "src_data/Q1-latest-whigal-85.fits"
     catalog_folder_path = ""
 
-    X_LOWER, X_UPPER = 0_000, 12_000
-    Y_LOWER, Y_UPPER = 0_000, 7_000
+    X_LOWER, X_UPPER = 4_000, 6_000
+    Y_LOWER, Y_UPPER = 3_000, 5_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER], single_slice=True)
-    sc.run(True, False, False, insert_artificial_cores=False, insert_artificial_artefacts=False, save=False, compare=False, merge=0, save_plots_and_images=False)
-
+    run_params = {
+        "unsharp_mask": False,
+        "wavelet": False,
+        "fourier": True,
+        "insert_artificial_cores": False, 
+        "insert_artificial_artefacts": False,
+        "save": False, 
+        "compare": False, 
+        "merge": False, 
+        "save_plots_and_images": False,
+        "plot_threshold": True,
+        "plot_images": False
+    }
+    sc.run(**run_params)
