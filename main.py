@@ -174,6 +174,7 @@ class Classifier:
     def get_radius(self, data, rows, cols):
         radius_list = []
         size = 25
+        k = 0
         for i in range(len(rows)):
             if rows[i] > len(data) - (size+1) or cols[i] > len(data[0]) - (size+1) or cols[i] - (size+1) < 0 or rows[i] - (size+1) < 0:
                 #raise ValueError("Invalid input.")
@@ -194,7 +195,7 @@ class Classifier:
             # Smooth this curve further by interpolating the values by a factor of 100
             x2 = range(len(avers))
             y2 = avers #interpolate.splev(x2, spl)
-            
+         
             
             
             # Traverse through the averages finding the first average to <= half the peak value
@@ -210,13 +211,56 @@ class Classifier:
             if not found_radius:
                 radius = 0
                 radius_list.append(0)
-
-        return radius_list
-            #if radius > 20:
+            
+            #if 0 < radius < 10:
             #    plt.title(f"Plotting dense core if radius greater than 20, radius: {radius}")
             #    plt.imshow(data_square)
             #    plt.show()
+            #    k += 1
+            #    fig, (ax1, ax2) = plt.subplots(1, 2)
+            #    fig.set_size_inches(18,7)
+            #    fig.set_dpi(300)
+                #fig.suptitle('Horizontally stacked subplots')
+                #ax1.set_title(f"Radie: {radius} [pixlar]")
+            #    ax1.set(xlabel='pixlar', ylabel='pixlar')
+            #    ax1.imshow(data_square)
+            #    ax1.imshow(data_square)
+            #    ax1.grid(alpha=0.5)
+            #    radius = round(radius)
+            #    ax2.set_title(f"Beräknat radievärde: {radius} [pixlar]")
+            #    ax2.set(xlabel='radiell förflyttning från centrum [pixlar]', ylabel='Intensitetsmedelvärde [M$_{\odot}$]')
+            #    y2 = y2*0.0081
+            #    ax2.plot(x2, y2)
+            #    half_max = np.ones(len(x2))*(peak + base_line)/2*0.0081
+            #    radius_function = np.ones(len(x2))*radius
+            #    ax2.plot(x2, half_max, "r")
+            #    ax2.plot(radius_function, y2,'--')
+            #    plt.show(fig)
+                #plt.clf()
+                #fig = plt.figure()
+                #plt.title(f"Plotting dense core if radius greater than 25, radius: {radius}")
+                #plt.imshow(data_square)
+                #plt.show()
+                #fig2 = plt.figure()
+                #plt.title(f"Radie {radius}")
+                #plt.plot(x2, y2)
+                #half_max = np.ones(len(x2))*peak/2
+                #radius_function = np.ones(len(x2))*radius
+                #plt.plot(x2, half_max, "r")
+                #plt.plot(radius_function, y2,'--')
+                #plt.grid(False)
+                #plt.show()
+                #plt.title(f"US: Plotting dense core if radius greater than 20, radius: {radius}")
+                #plt.imshow(us_data_square)
+                #plt.show()
+                
+       
+                #plt.show()
+        print("Found cores over 20:", k)
+        print("Cores not found:", len(radius_list) - np. count_nonzero(radius_list))
 
+        return radius_list
+            
 
     def plot_cores_from_catalog(self, catalog):
         k = 0
@@ -504,8 +548,6 @@ class Classifier:
                 
                 dense_cores_mask = dense_cores_mask & np.logical_not(artefacts_mask)
                 
-
-   
                 end = time.time()
                 print("Removing artefacts done")
                 print('Execution time:', time.strftime("%H:%M:%S", time.gmtime(end - start)), "\n")
@@ -560,7 +602,8 @@ class Classifier:
                 
                 full_artefact_mask = dense_cores_mask & artefacts_mask
                 radius_and_artefacts = self.get_radius(slice, dense_and_artefacts_x, dense_and_artefacts_y)
-                mass_list_and_artefacts = self.get_mass(slice, dense_and_artefacts_x, dense_and_artefacts_y, radius_and_artefacts)
+                mass_list_and_artefacts = np.array(self.get_mass(slice, dense_and_artefacts_x, dense_and_artefacts_y, radius_and_artefacts))*0.0081
+                radius_and_artefacts = np.array(radius_and_artefacts, dtype=float)*0.02
                 print("Calulating mass and radius done")
                 
                 artefact_flag = []
@@ -586,9 +629,9 @@ class Classifier:
                     #catalog = np.array([list(zip(dense_and_artefacts_x_compensated, dense_and_artefacts_y)), radius_and_artefacts, mass_list_and_artefacts, artefact_flag], dtype=object)
                     radius_and_artefacts = np.array(radius_and_artefacts, dtype=int)
                     catalog = np.array([np.array(range(0, len(dense_and_artefacts_x_compensated)), dtype=np.str), dense_and_artefacts_x_compensated, dense_and_artefacts_y, radius_and_artefacts, mass_list_and_artefacts, artefact_flag], dtype=np.str)
-                    catalog = np.hstack([[["Index"], ["X"], ["Y"], ["Radius"], ["Mass"], ["Is artefact"]], np.array(catalog,dtype=np.str)])
+                    catalog = np.hstack([[["Index"], ["X"], ["Y"], ["Radius [pc]"], ["Mass [M$_{\odot}$]"], ["Is artefact"]], np.array(catalog,dtype=np.str)])
                     
-                
+                    
                     if insert_artificial_cores and insert_artificial_artefacts:
                         performance = f"Artificial cores percentage:{num_found}, arificial artefacts percentage:{num_found_2}"
                         save_file = np.array([parameter_info, performance, catalog], dtype=object)
@@ -654,9 +697,9 @@ if __name__ == "__main__":
     src_path = ""
     catalog_folder_path = ""
 
-    X_LOWER, X_UPPER = 0_000, 12_000
+    X_LOWER, X_UPPER = 0_000, 3_000
     Y_LOWER, Y_UPPER = 0, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER], single_slice=True)
-    sc.run(True, False, False, insert_artificial_cores=False, insert_artificial_artefacts=False, save=False, compare=False, merge=False, save_plots_and_images=False)
+    sc.run(True, False, False, insert_artificial_cores=False, insert_artificial_artefacts=False, save=True, compare=False, merge=False, save_plots_and_images=False)
 
