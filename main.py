@@ -191,19 +191,28 @@ class Classifier:
             
             # Approxomate a smooth curve of these averages using smooth spline approximation
             #spl = interpolate.splrep(range(len(avers)), avers)
-            
-            # Smooth this curve further by interpolating the values by a factor of 100
+            x1 = np.linspace(0, 20, num=1280)
+            #print(avers)
+            #print(len(avers))
             x2 = range(len(avers))
-            y2 = avers #interpolate.splev(x2, spl)
+           
+            y2 = np.interp(x1,x2, avers)
+            #print("y2:", y2)
+            #plt.plot(x1, y2)
+            #plt.show()
+            # Smooth this curve further by interpolating the values by a factor of 100
+            #x2 = range(len(avers))
+            
+            #y2 = avers #interpolate.splev(x2, spl)
          
             
             
             # Traverse through the averages finding the first average to <= half the peak value
             # ( Full width half max )
             found_radius = False
-            for j in x2:
+            for j in range(len(x1)):
                 if (y2[j] - base_line) <= (peak - base_line)/2:
-                    radius = x2[j]
+                    radius = x1[j]
                     radius_list.append(radius)
                     found_radius = True
                     break
@@ -258,42 +267,56 @@ class Classifier:
                 #plt.show()
         print("Found cores over 20:", k)
         print("Cores not found:", len(radius_list) - np. count_nonzero(radius_list))
+        print(radius_list)
 
         return radius_list
             
 
-    def plot_cores_from_catalog(self, catalog):
+    def plot_cores_from_catalog(self, slice):
         k = 0
         found_cores = []
-        for i in catalog[0]: #creating a list of pictures of dense cores
-            y=i[0]
-            x=i[1]
+        x_coordinates_list = [36149, 4934, 77151, 84804, 71287, 64872, 37147, 70097, 64957, 71585, 37703, 110745, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 8000]
+        y_coordinates_list = [131,393,679,701,818,844,864,880,889,904,924,945,960,1044,1089, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 5000]             
+
+        for i in range(len(x_coordinates_list)): #creating a list of pictures of dense cores
+            y=y_coordinates_list[i]
+            x=x_coordinates_list[i]
             size = 51
-            data_square = self.cutouts[0][(y-size):(y+size), (x-size):(x+size)]
+            data_square = slice[(y-size):(y+size), (x-size):(x+size)]
             found_cores.append(data_square)
-            if k > 50:
-                break
+
             k += 1
+        print(len(found_cores))
         
         # Plotting dense cores
-        fig = plt.figure(figsize=(26, 10))
-        fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0, hspace=0.2)
-        columns = 8
+        fig = plt.figure(figsize=(10, 15))
+        fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.1, hspace=0.1)
+        columns = 2
         rows = 3
         
         # ax enables access to manipulate each of subplots
-        ax = []
-        for i in range(columns*rows):
+        i = 0
+        
+        for j in range(len(x_coordinates_list)//(columns*rows)+11):
+            print((len(x_coordinates_list)//(columns*rows)))
+            ax = []
+            print(j)
+            for k in range(columns*rows):
             # create subplot and append to ax
-            ax.append(fig.add_subplot(rows, columns, i+1))
-            plt.grid(False)
-            plt.axis('off')
-            
-            #ax[-1].set_title("ax:"+str(i))  # set title
-            ax[-1].set_title(f"{catalog[0][i]}")  # set title as coordinates
-            plt.imshow(found_cores[i], alpha=1)
-    
-        plt.show()  
+                
+                ax.append(fig.add_subplot(rows, columns, k+1))
+                plt.grid(False)
+                plt.axis('off')
+                
+                #ax[-1].set_title("ax:"+str(i))  # set title
+                ax[-1].set_title(f"({x_coordinates_list[i]}, {y_coordinates_list[i]}")  # set title as coordinates
+                plt.imshow(found_cores[i], alpha=1)
+                i += 1
+                print(i)
+            plt.show()
+            ax.cla() 
+            plt.clf() 
+        
 
     def check_overlap(self, catalog_1, catalog_2, pixel_perfect=False, plot=False):
         if pixel_perfect:
@@ -509,22 +532,6 @@ class Classifier:
         fourier_lp_filter_radius = 100 # Radius of fourier low pass filter
         fourier_absolute_threshold = 2 # Absolute threshold of fourier low pass filter
         
-        
-        if compare:
-            catalog_1 = np.load("test.npy", allow_pickle=True)
-            catalog_2 = np.load("test2.npy",allow_pickle=True)
-            self.plot_cores_from_catalog(catalog_1[1])
-            self.plot_cores_from_catalog(catalog_2[1])
-            #self.plot_cores_from_catalog(catalog_1[1])
-            #print(catalog_1[1][0])
-            #print(catalog_2[1][0])
-            print("Found in 1:", len(catalog_1[1][1]))
-            print("Found in 2:", len(catalog_2[1][1]))
-            self.check_overlap(catalog_1[1], catalog_2[1], pixel_perfect=False, plot=False)
-            self.check_in_1_not_2(catalog_1[1], catalog_2[1], pixel_perfect=False, plot=False, name="catalog 1")
-            self.check_in_1_not_2(catalog_2[1], catalog_1[1], pixel_perfect=False, plot=False, name="catalog 2")
-            return None
-        
         if merge > 0:
             
             print("Creating merged file...")
@@ -567,7 +574,7 @@ class Classifier:
         current_slice = 0
         
         for i, slice in enumerate(tqdm(self.cutouts)):
-            plot(slice, cmap="hot", norm=colors.Normalize(0, 70))
+            #plot(slice, cmap="hot", norm=colors.Normalize(0, 70))
             
             if not self.single_slice:
                 self.limits = [Y_LOWER, Y_UPPER, X_UPPER*current_slice, X_UPPER*(current_slice+1)]
@@ -582,6 +589,24 @@ class Classifier:
             
             # Calculate unsharp mask
             methods_list = []
+             
+            if compare:
+                
+        
+                #catalog_1 = np.load("test.npy", allow_pickle=True)
+                #catalog_2 = np.load("test2.npy",allow_pickle=True)
+                self.plot_cores_from_catalog(slice)
+                #self.plot_cores_from_catalog(catalog_2[1])
+                #self.plot_cores_from_catalog(catalog_1[1])
+                #print(catalog_1[1][0])
+                #print(catalog_2[1][0])
+                #print("Found in 1:", len(catalog_1[1][1]))
+                #print("Found in 2:", len(catalog_2[1][1]))
+                #self.check_overlap(catalog_1[1], catalog_2[1], pixel_perfect=False, plot=False)
+                #self.check_in_1_not_2(catalog_1[1], catalog_2[1], pixel_perfect=False, plot=False, name="catalog 1")
+                #self.check_in_1_not_2(catalog_2[1], catalog_1[1], pixel_perfect=False, plot=False, name="catalog 2")
+                return None
+            
             if unsharp_mask:
                 print("\n", "Creating unsharp mask")
                 start = time.time()
@@ -819,24 +844,24 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = "src_data/Q1-latest-whigal-85.fits"
+    src_path = ""
     catalog_folder_path = ""
 
-    X_LOWER, X_UPPER = 4_000, 6_000
-    Y_LOWER, Y_UPPER = 3_000, 5_000
+    X_LOWER, X_UPPER = 0_000, 10_000
+    Y_LOWER, Y_UPPER = 0_000, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER], single_slice=True)
     run_params = {
-        "unsharp_mask": False,
+        "unsharp_mask": True,
         "wavelet": False,
-        "fourier": True,
+        "fourier": False,
         "insert_artificial_cores": False, 
         "insert_artificial_artefacts": False,
         "save": False, 
         "compare": False, 
         "merge": False, 
         "save_plots_and_images": False,
-        "plot_threshold": True,
+        "plot_threshold": False,
         "plot_images": False
     }
     sc.run(**run_params)

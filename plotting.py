@@ -70,7 +70,7 @@ def scatter_plot(xs, ys, title=None, xlabel=None, ylabel=None, dpi=100, xscale='
     ax.scatter(xs, ys, s=s)
     ax.set_yscale(xscale)
     ax.set_xscale(yscale)
-    plt.xlim(0.01, 1)
+    plt.xlim(0.01, 0.45)
     plt.show()
             
 def blob_plot_multiple(detection_list, data_list, ylow, yhigh, xlow, xhigh, dpi=100, cmap="inferno"):
