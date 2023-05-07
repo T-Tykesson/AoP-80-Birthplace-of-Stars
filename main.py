@@ -143,6 +143,10 @@ class Classifier:
     def insert_artificial_cores_new(self, size_min=5, size_max=120, amount=1333, intensity="Random", int_min=50, int_max=350):
         for i, cutout in enumerate(self.cutouts):
             self.cutouts[i], self.art_cores_coords[i], _ = artificial_cores.insert_art_cores_2(cutout, amount=amount, size_min=size_min, size_max=size_max, intensity=intensity, int_min=int_min, int_max=int_max)
+    
+    def insert_artificial_cores_from_dist(self, amount, distribution, kernel_size=1001):
+        for i, cutout in enumerate(self.cutouts):
+            self.cutouts[i], self.art_cores_coords[i] = artificial_cores.insert_art_cores_distribution(cutout, amount, distribution, kernel_size=kernel_size)
             
             
     def insert_artificial_artefacts(self, amount=1333, intensity="Random", int_min=50, int_max=350):
@@ -156,7 +160,7 @@ class Classifier:
     def get_mass(self, data, rows, cols, lengths):
         mass_list = []
         for i in range(len(rows)):
-
+            rows[i] = round(rows[i])
             if rows[i] > len(data) - lengths[i] or cols[i] > len(data[0]) - lengths[i] or cols[i] - lengths[i] < 0 or rows[i] - lengths[i] < 0:
                 mass_list.append(0)
                 continue
@@ -164,6 +168,7 @@ class Classifier:
                 mass_list.append(0)
             
             else:
+                
                 circle_mask = artefacts.create_filled_circular_mask(int(lengths[i])*2, int(lengths[i])*2)
                 data_square = data[(rows[i]-int(lengths[i])):(rows[i]+int(lengths[i])), (cols[i]-int(lengths[i])):(cols[i]+int(lengths[i]))]
                 mass = np.sum(data_square * circle_mask)
@@ -221,7 +226,8 @@ class Classifier:
                 radius = 0
                 radius_list.append(0)
             
-            #if 0 < radius < 10:
+            if radius > 20:
+                k += 1
             #    plt.title(f"Plotting dense core if radius greater than 20, radius: {radius}")
             #    plt.imshow(data_square)
             #    plt.show()
@@ -267,7 +273,7 @@ class Classifier:
                 #plt.show()
         print("Found cores over 20:", k)
         print("Cores not found:", len(radius_list) - np. count_nonzero(radius_list))
-        print(radius_list)
+        #print(radius_list)
 
         return radius_list
             
@@ -317,63 +323,6 @@ class Classifier:
             ax.cla() 
             plt.clf() 
         
-
-    def check_overlap(self, catalog_1, catalog_2, pixel_perfect=False, plot=False):
-        if pixel_perfect:
-            overlap = np.intersect1d(catalog_1[0], catalog_2[0])
-            print("Overlap:", len(overlap))
-        else:
-            #If 
-            overlap = []
-            error = 3 #Value in pixels
-            for c in catalog_1[0]:
-                distances = np.linalg.norm(np.array([*catalog_2[0]])-list(c), axis=1)
-                min_index = np.argmin(distances)
-                if distances[min_index] <= error:
-                    overlap.append(c)
-                    
-            print("Overlap:", len(overlap))
-        
-        if plot:
-            for i in overlap:
-                y=i[0]
-                x=i[1]
-                size = 101
-                data_square = self.cutouts[0][(y-size):(y+size+1), (x-size):(x+size+1)]
-                #plt.title(f"Radius:{catalog[1][k]}, Mass:{catalog[2][k]}, Artefact:{catalog[3][k]}")
-                plt.grid(False)
-                plt.imshow(data_square)
-                plt.show()
-                #k += 1
-                
-    def check_in_1_not_2(self, catalog_1, catalog_2, pixel_perfect=False, plot=False, name=None):
-        if pixel_perfect:
-            one_not_two = np.setdiff1d(catalog_1[0],catalog_2[0])
-            print(f"Only in {name}:", len(one_not_two))
-        else:
-            error = 3
-            one_not_two = []
-            for c in catalog_1[0]:
-                distances = np.linalg.norm(np.array([*catalog_2[0]])-list(c), axis=1)
-                min_index = np.argmin(distances)
-                if distances[min_index] > error:
-                    one_not_two.append(c)
-                    
-            print(f"Only in {name}:", len(one_not_two))
-        
-        if plot:
-            for i in one_not_two:
-                y=i[0]
-                x=i[1]
-                size = 51
-                data_square = self.cutouts[0][(y-size):(y+size), (x-size):(x+size)]
-                
-                #plt.title(f"Radius:{catalog[1][k]}, Mass:{catalog[2][k]}, Artefact:{catalog[3][k]}")
-                plt.grid(False)
-                plt.imshow(data_square)
-                plt.show()
-                #k += 1
-    
     def merge_catalogs(self, catalog_1, catalog_2):
         merged_catalog = np.zeros((len(catalog_1), len(catalog_1[0]) + len(catalog_2[0])))
         merged_catalog_index = 0
@@ -505,7 +454,7 @@ class Classifier:
     def run(self, unsharp_mask, wavelet, fourier, plot_images=False, insert_artificial_cores=True, insert_artificial_artefacts=True, save=False, compare=False, merge=False, plot_threshold=False, save_plots_and_images=False, show_plots_and_images=False): 
         # Definition parameters
         length = 61  # Size of box to expand around peaks when checking against the definition of a d.c.
-        mult = 2 # Factor that peak has to exceed surrounding standard deviation
+        mult = 5 # Factor that peak has to exceed surrounding standard deviation
         lowest_peak_height = 0  # Minimum above surrounding mean value
         check_bbox_size = 3  # Size of bounding box around wavelet peaks for local maximas (This doesnt really make any sense, why would the peak not be where the wavelet identified it?)
         wavlet_levels = 1  # Number of levels to run wavelet
@@ -516,7 +465,11 @@ class Classifier:
         unsh_mask_absolute_threshold = 2  # Aboslute mimimum of the unsharp mask
         unsh_mask_sigma = 1 # Sigma of unsharp mask
         
-        artificial_cores = 1000  # Number of artificial cores to insert
+        artificial_cores = 1000  # Number of artificial cores to insert (per slice)
+        kernel_size_for_distr = 1001
+        radius_mass_distribution = np.transpose(np.load("radius-mass-distribution.npy")) #the distribution the arteficial cores will simulate
+        
+        #Old method
         artificial_kernel_size = 15
         intensity_value_art_cores = "Random" #Random intensity value if "Random", write number for fixed intensity
         artificial_cores_size_min = 5 #min kernel size, note this is not the same as the caluclated radius using fwhm
@@ -565,7 +518,8 @@ class Classifier:
         if insert_artificial_cores:
             print("Inserting artificial cores")
             #self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
-            self.insert_artificial_cores_new(amount=artificial_cores, size_min=artificial_cores_size_min, size_max=artificial_cores_size_max, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
+            #self.insert_artificial_cores_new(amount=artificial_cores, size_min=artificial_cores_size_min, size_max=artificial_cores_size_max, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
+            self.insert_artificial_cores_from_dist(artificial_cores, radius_mass_distribution, kernel_size=kernel_size_for_distr)
             print("Insertion done", "\n")
         if insert_artificial_artefacts:
             print("Inserting artificial artefacts")
@@ -589,23 +543,6 @@ class Classifier:
             
             # Calculate unsharp mask
             methods_list = []
-             
-            if compare:
-                
-        
-                #catalog_1 = np.load("test.npy", allow_pickle=True)
-                #catalog_2 = np.load("test2.npy",allow_pickle=True)
-                self.plot_cores_from_catalog(slice)
-                #self.plot_cores_from_catalog(catalog_2[1])
-                #self.plot_cores_from_catalog(catalog_1[1])
-                #print(catalog_1[1][0])
-                #print(catalog_2[1][0])
-                #print("Found in 1:", len(catalog_1[1][1]))
-                #print("Found in 2:", len(catalog_2[1][1]))
-                #self.check_overlap(catalog_1[1], catalog_2[1], pixel_perfect=False, plot=False)
-                #self.check_in_1_not_2(catalog_1[1], catalog_2[1], pixel_perfect=False, plot=False, name="catalog 1")
-                #self.check_in_1_not_2(catalog_2[1], catalog_1[1], pixel_perfect=False, plot=False, name="catalog 2")
-                return None
             
             if unsharp_mask:
                 print("\n", "Creating unsharp mask")
@@ -746,6 +683,8 @@ class Classifier:
                 radius = np.array(self.get_radius(slice, dense_x, dense_y), dtype=float)
                 mass_list = np.array(self.get_mass(slice, dense_x, dense_y, radius), dtype=float)*0.0081
                 scatter_plot(radius*0.02, mass_list, xlabel="radie [pc]", ylabel="massa [M$_{\odot}$]", yscale="log", xscale='log', s=1)
+                #rad_mass = np.array([radius, mass_list], dtype=float)
+                #np.save("radius-mass-distribution.npy", rad_mass)
                 
                 full_artefact_mask = dense_cores_mask & artefacts_mask
                 radius_and_artefacts = self.get_radius(slice, dense_and_artefacts_x, dense_and_artefacts_y)
@@ -844,10 +783,10 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path = ""
+    src_path =  ""
     catalog_folder_path = ""
 
-    X_LOWER, X_UPPER = 0_000, 10_000
+    X_LOWER, X_UPPER = 0_000, 40_000
     Y_LOWER, Y_UPPER = 0_000, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER], single_slice=True)
