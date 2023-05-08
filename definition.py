@@ -111,7 +111,7 @@ def get_std_from_matrices(matrices, remove_size=None, max_diff=0.1, step=6 ):
         sub_lists = remove_centre_from_matrices_and_flatten(matrices, remove_len=0)
         prev_std_from_sub_lists = np.std(sub_lists, axis=1)
         
-        for i in tqdm(range(step + 1, max_remove_size, step)):
+        for i in tqdm(range(step + 1, max_remove_size, step), leave = True, position = 0):
             sub_lists = remove_centre_from_matrices_and_flatten(matrices, remove_len=i)
             std_from_sub_lists = np.std(sub_lists, axis=1)
             std_diff = prev_std_from_sub_lists - std_from_sub_lists

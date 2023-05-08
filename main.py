@@ -4,6 +4,7 @@ import skimage
 from plotting import *
 import definition
 from artefacts import *
+import artefacts
 import artificial_cores
 
 from astropy.io import fits
@@ -143,6 +144,10 @@ class Classifier:
     def insert_artificial_cores_new(self, size_min=5, size_max=120, amount=1333, intensity="Random", int_min=50, int_max=350):
         for i, cutout in enumerate(self.cutouts):
             self.cutouts[i], self.art_cores_coords[i], _ = artificial_cores.insert_art_cores_2(cutout, amount=amount, size_min=size_min, size_max=size_max, intensity=intensity, int_min=int_min, int_max=int_max)
+    
+    def insert_artificial_cores_from_dist(self, amount, distribution, kernel_size=1001):
+        for i, cutout in enumerate(self.cutouts):
+            self.cutouts[i], self.art_cores_coords[i] = artificial_cores.insert_art_cores_distribution(cutout, amount, distribution, kernel_size=kernel_size)
             
             
     def insert_artificial_artefacts(self, amount=1333, intensity="Random", int_min=50, int_max=350):
@@ -156,18 +161,34 @@ class Classifier:
     def get_mass(self, data, rows, cols, lengths):
         mass_list = []
         for i in range(len(rows)):
-
+            radius = round(lengths[i])
+            #print(lengths[i], round(lengths[i]))
             if rows[i] > len(data) - lengths[i] or cols[i] > len(data[0]) - lengths[i] or cols[i] - lengths[i] < 0 or rows[i] - lengths[i] < 0:
                 mass_list.append(0)
                 continue
-            if lengths[i] == 0:
+            
+            if  radius == 0:
                 mass_list.append(0)
             
+            elif round(radius) == 0: #if radius is less than 0.5, take only the central pixelvalue as radius
+                mass = data[rows[i], cols[i]]
+                mass_list.append(mass)
+                
             else:
-                circle_mask = create_filled_circular_mask(int(lengths[i])*2, int(lengths[i])*2)
-                data_square = data[(rows[i]-int(lengths[i])):(rows[i]+int(lengths[i])), (cols[i]-int(lengths[i])):(cols[i]+int(lengths[i]))]
+                circle_mask = artefacts.create_filled_circular_mask(radius*2+1, radius*2+1)
+                data_square = data[(rows[i]-radius):(rows[i]+radius+1), (cols[i]-radius):(cols[i]+radius+1)]
                 mass = np.sum(data_square * circle_mask)
                 mass_list.append(mass)
+                
+                #if 1 < round(lengths[i]) <= 5:
+                #    plt.imshow(circle_mask)
+                #    plt.title(f"circle mask {lengths[i]}")
+                #    plt.show()
+                    
+                #    plt.imshow(data_square)
+                #    a = len(data_square)
+                #    plt.title(f"{a}")
+                #    plt.show()
                 
         return mass_list
         
@@ -177,7 +198,6 @@ class Classifier:
         k = 0
         for i in range(len(rows)):
             if rows[i] > len(data) - (size+1) or cols[i] > len(data[0]) - (size+1) or cols[i] - (size+1) < 0 or rows[i] - (size+1) < 0:
-                #raise ValueError("Invalid input.")
                 radius_list.append(0)
                 continue
             
@@ -191,19 +211,16 @@ class Classifier:
             
             # Approxomate a smooth curve of these averages using smooth spline approximation
             #spl = interpolate.splrep(range(len(avers)), avers)
-            
-            # Smooth this curve further by interpolating the values by a factor of 100
+            x1 = np.linspace(0, size, num=size*100)
             x2 = range(len(avers))
-            y2 = avers #interpolate.splev(x2, spl)
-         
-            
+            y2 = np.interp(x1,x2, avers)
             
             # Traverse through the averages finding the first average to <= half the peak value
             # ( Full width half max )
             found_radius = False
-            for j in x2:
+            for j in range(len(x1)):
                 if (y2[j] - base_line) <= (peak - base_line)/2:
-                    radius = x2[j]
+                    radius = x1[j]
                     radius_list.append(radius)
                     found_radius = True
                     break
@@ -212,145 +229,79 @@ class Classifier:
                 radius = 0
                 radius_list.append(0)
             
-            #if 0 < radius < 10:
-            #    plt.title(f"Plotting dense core if radius greater than 20, radius: {radius}")
-            #    plt.imshow(data_square)
-            #    plt.show()
-            #    k += 1
-            #    fig, (ax1, ax2) = plt.subplots(1, 2)
-            #    fig.set_size_inches(18,7)
-            #    fig.set_dpi(300)
+            if  radius > 20: #can be used to plot cores of different radius
+                k += 1
+                #fig, (ax1, ax2) = plt.subplots(1, 2)
+                #fig.set_size_inches(18,7)
+                #fig.set_dpi(300)
                 #fig.suptitle('Horizontally stacked subplots')
                 #ax1.set_title(f"Radie: {radius} [pixlar]")
-            #    ax1.set(xlabel='pixlar', ylabel='pixlar')
-            #    ax1.imshow(data_square)
-            #    ax1.imshow(data_square)
-            #    ax1.grid(alpha=0.5)
-            #    radius = round(radius)
-            #    ax2.set_title(f"Beräknat radievärde: {radius} [pixlar]")
-            #    ax2.set(xlabel='radiell förflyttning från centrum [pixlar]', ylabel='Intensitetsmedelvärde [M$_{\odot}$]')
-            #    y2 = y2*0.0081
-            #    ax2.plot(x2, y2)
-            #    half_max = np.ones(len(x2))*(peak + base_line)/2*0.0081
-            #    radius_function = np.ones(len(x2))*radius
-            #    ax2.plot(x2, half_max, "r")
-            #    ax2.plot(radius_function, y2,'--')
-            #    plt.show(fig)
+                #ax1.set(xlabel='pixlar', ylabel='pixlar')
+                #ax1.imshow(data_square)
+                #ax1.imshow(data_square)
+                #ax1.grid(alpha=0.5)
+                #radius = round(radius, 2)
+                #ax2.set_title(f"Beräknat radievärde: {radius} [pixlar]")
+                #ax2.set(xlabel='radiell förflyttning från centrum [pixlar]', ylabel='Intensitetsmedelvärde [M$_{\odot}$]')
+                #y2 = y2*0.0081
+                #ax2.plot(x1, y2)
+                ##half_max = np.ones(len(x1))*(peak + base_line)/2*0.0081
+                #radius_function = np.ones(len(x1))*radius
+                #ax2.plot(x1, half_max, "r")
+                #ax2.plot(radius_function, y2,'--')
+                #plt.show(fig)
                 #plt.clf()
-                #fig = plt.figure()
-                #plt.title(f"Plotting dense core if radius greater than 25, radius: {radius}")
-                #plt.imshow(data_square)
-                #plt.show()
-                #fig2 = plt.figure()
-                #plt.title(f"Radie {radius}")
-                #plt.plot(x2, y2)
-                #half_max = np.ones(len(x2))*peak/2
-                #radius_function = np.ones(len(x2))*radius
-                #plt.plot(x2, half_max, "r")
-                #plt.plot(radius_function, y2,'--')
-                #plt.grid(False)
-                #plt.show()
-                #plt.title(f"US: Plotting dense core if radius greater than 20, radius: {radius}")
-                #plt.imshow(us_data_square)
-                #plt.show()
-                
-       
-                #plt.show()
         print("Found cores over 20:", k)
         print("Cores not found:", len(radius_list) - np. count_nonzero(radius_list))
 
         return radius_list
             
 
-    def plot_cores_from_catalog(self, catalog):
+    def plot_cores_from_catalog(self, slice):
         k = 0
         found_cores = []
-        for i in catalog[0]: #creating a list of pictures of dense cores
-            y=i[0]
-            x=i[1]
+        x_coordinates_list = [36149, 4934, 77151, 84804, 71287, 64872, 37147, 70097, 64957, 71585, 37703, 110745, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 8000]
+        y_coordinates_list = [131,393,679,701,818,844,864,880,889,904,924,945,960,1044,1089, 3000, 3000, 3000, 3000, 3000, 3000, 3000, 5000]             
+
+        for i in range(len(x_coordinates_list)): #creating a list of pictures of dense cores
+            y=y_coordinates_list[i]
+            x=x_coordinates_list[i]
             size = 51
-            data_square = self.cutouts[0][(y-size):(y+size), (x-size):(x+size)]
+            data_square = slice[(y-size):(y+size), (x-size):(x+size)]
             found_cores.append(data_square)
-            if k > 50:
-                break
+
             k += 1
+        print(len(found_cores))
         
         # Plotting dense cores
-        fig = plt.figure(figsize=(26, 10))
-        fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0, hspace=0.2)
-        columns = 8
+        fig = plt.figure(figsize=(10, 15))
+        fig.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.1, hspace=0.1)
+        columns = 2
         rows = 3
         
         # ax enables access to manipulate each of subplots
-        ax = []
-        for i in range(columns*rows):
+        i = 0
+        
+        for j in range(len(x_coordinates_list)//(columns*rows)+11):
+            print((len(x_coordinates_list)//(columns*rows)))
+            ax = []
+            print(j)
+            for k in range(columns*rows):
             # create subplot and append to ax
-            ax.append(fig.add_subplot(rows, columns, i+1))
-            plt.grid(False)
-            plt.axis('off')
-            
-            #ax[-1].set_title("ax:"+str(i))  # set title
-            ax[-1].set_title(f"{catalog[0][i]}")  # set title as coordinates
-            plt.imshow(found_cores[i], alpha=1)
-    
-        plt.show()  
-
-    def check_overlap(self, catalog_1, catalog_2, pixel_perfect=False, plot=False):
-        if pixel_perfect:
-            overlap = np.intersect1d(catalog_1[0], catalog_2[0])
-            print("Overlap:", len(overlap))
-        else:
-            #If 
-            overlap = []
-            error = 3 #Value in pixels
-            for c in catalog_1[0]:
-                distances = np.linalg.norm(np.array([*catalog_2[0]])-list(c), axis=1)
-                min_index = np.argmin(distances)
-                if distances[min_index] <= error:
-                    overlap.append(c)
-                    
-            print("Overlap:", len(overlap))
-        
-        if plot:
-            for i in overlap:
-                y=i[0]
-                x=i[1]
-                size = 101
-                data_square = self.cutouts[0][(y-size):(y+size+1), (x-size):(x+size+1)]
-                #plt.title(f"Radius:{catalog[1][k]}, Mass:{catalog[2][k]}, Artefact:{catalog[3][k]}")
-                plt.grid(False)
-                plt.imshow(data_square)
-                plt.show()
-                #k += 1
                 
-    def check_in_1_not_2(self, catalog_1, catalog_2, pixel_perfect=False, plot=False, name=None):
-        if pixel_perfect:
-            one_not_two = np.setdiff1d(catalog_1[0],catalog_2[0])
-            print(f"Only in {name}:", len(one_not_two))
-        else:
-            error = 3
-            one_not_two = []
-            for c in catalog_1[0]:
-                distances = np.linalg.norm(np.array([*catalog_2[0]])-list(c), axis=1)
-                min_index = np.argmin(distances)
-                if distances[min_index] > error:
-                    one_not_two.append(c)
-                    
-            print(f"Only in {name}:", len(one_not_two))
-        
-        if plot:
-            for i in one_not_two:
-                y=i[0]
-                x=i[1]
-                size = 51
-                data_square = self.cutouts[0][(y-size):(y+size), (x-size):(x+size)]
-                
-                #plt.title(f"Radius:{catalog[1][k]}, Mass:{catalog[2][k]}, Artefact:{catalog[3][k]}")
+                ax.append(fig.add_subplot(rows, columns, k+1))
                 plt.grid(False)
-                plt.imshow(data_square)
-                plt.show()
-                #k += 1
-    
+                plt.axis('off')
+                
+                #ax[-1].set_title("ax:"+str(i))  # set title
+                ax[-1].set_title(f"({x_coordinates_list[i]}, {y_coordinates_list[i]}")  # set title as coordinates
+                plt.imshow(found_cores[i], alpha=1)
+                i += 1
+                print(i)
+            plt.show()
+            ax.cla() 
+            plt.clf() 
+        
     def merge_catalogs(self, catalog_1, catalog_2):
         merged_catalog = np.zeros((len(catalog_1), len(catalog_1[0]) + len(catalog_2[0])))
         merged_catalog_index = 0
@@ -519,7 +470,11 @@ class Classifier:
         unsh_mask_absolute_threshold = 0.5  # Aboslute mimimum of the unsharp mask
         unsh_mask_sigma = 1 # Sigma of unsharp mask
         
-        artificial_cores = 1000  # Number of artificial cores to insert
+        artificial_cores = 5000  # Number of artificial cores to insert (per slice)
+        kernel_size_for_distr = 1001
+        radius_mass_distribution = np.transpose(np.load("radius-mass-distribution_4.npy")) #the distribution the arteficial cores will simulate
+        
+        #Old method
         artificial_kernel_size = 15
         intensity_value_art_cores = "Random" #Random intensity value if "Random", write number for fixed intensity
         artificial_cores_size_min = 5 #min kernel size, note this is not the same as the caluclated radius using fwhm
@@ -593,7 +548,8 @@ class Classifier:
         if insert_artificial_cores:
             print("Inserting artificial cores")
             #self.insert_artificial_cores(amount=artificial_cores, kernel_size=artificial_kernel_size, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
-            self.insert_artificial_cores_new(amount=artificial_cores, size_min=artificial_cores_size_min, size_max=artificial_cores_size_max, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
+            #self.insert_artificial_cores_new(amount=artificial_cores, size_min=artificial_cores_size_min, size_max=artificial_cores_size_max, intensity=intensity_value_art_cores, int_min=artificial_cores_intensity_min, int_max=artificial_cores_intensity_max)
+            self.insert_artificial_cores_from_dist(artificial_cores, radius_mass_distribution, kernel_size=kernel_size_for_distr)
             print("Insertion done", "\n")
         if insert_artificial_artefacts:
             print("Inserting artificial artefacts")
@@ -602,7 +558,7 @@ class Classifier:
         current_slice = 0
         
         for i, slice in enumerate(tqdm(self.cutouts)):
-            plot(slice, cmap="hot", norm=colors.Normalize(0, 70))
+            #plot(slice, cmap="hot", norm=colors.Normalize(0, 70))
             
             if not self.single_slice:
                 self.limits = [Y_LOWER, Y_UPPER, X_UPPER*current_slice, X_UPPER*(current_slice+1)]
@@ -617,6 +573,7 @@ class Classifier:
             
             # Calculate unsharp mask
             methods_list = []
+            
             if unsharp_mask:
                 print("\n", "Creating unsharp mask")
                 start = time.time()
@@ -765,6 +722,8 @@ class Classifier:
                 radius = np.array(self.get_radius(slice, dense_y, dense_x), dtype=float)
                 mass_list = np.array(self.get_mass(slice, dense_y, dense_x, radius), dtype=float)*0.0081
                 scatter_plot(radius*0.02, mass_list, xlabel="radie [pc]", ylabel="massa [M$_{\odot}$]", yscale="log", xscale='log', s=1)
+                #rad_mass = np.array([radius, mass_list], dtype=float)
+                #np.save("radius-mass-distribution_name.npy", rad_mass) #Save mass-radius distribution for art cores
                 
                 full_artefact_mask = dense_cores_mask & artefacts_mask
                 radius_and_artefacts = self.get_radius(slice, dense_and_artefacts_y, dense_and_artefacts_x)
