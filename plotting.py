@@ -117,6 +117,114 @@ def plot_figure(func, title, norm=None, dpi=None):
     plt.colorbar(im, cax=cax)
     plt.show()
 
+    
+def plot_catalog(path, catalog, data):
+    xs = np.array(catalog[1], dtype=int)
+    ys = np.array(catalog[2], dtype=int)
+    radius_list = catalog[3]
+    mass_list = catalog[4]
+    artefact_list = np.max(catalog[5:8, :], axis=0)
+    unsharp = np.array(catalog[8], dtype=bool)
+    wavelet = np.array(catalog[9], dtype=bool)
+    fourier = np.array(catalog[10], dtype=bool)
+    
+    Path(path + "unsharp_mask/dense_cores/").mkdir(parents=True, exist_ok=True)
+    Path(path + "unsharp_mask/artefacts/").mkdir(parents=True, exist_ok=True)
+    Path(path + "unsharp_mask/artefacts (unsure)/").mkdir(parents=True, exist_ok=True)
+    Path(path + "wavelet/dense_cores/").mkdir(parents=True, exist_ok=True)
+    Path(path + "wavelet/artefacts/").mkdir(parents=True, exist_ok=True)
+    Path(path + "wavelet/artefacts (unsure)/").mkdir(parents=True, exist_ok=True)
+    Path(path + "fourier/dense_cores/").mkdir(parents=True, exist_ok=True)
+    Path(path + "fourier/artefacts/").mkdir(parents=True, exist_ok=True)
+    Path(path + "fourier/artefacts (unsure)/").mkdir(parents=True, exist_ok=True)
+    Path(path + "mixed/dense_cores/").mkdir(parents=True, exist_ok=True)
+    Path(path + "mixed/artefacts/").mkdir(parents=True, exist_ok=True)
+    Path(path + "mixed/artefacts (unsure)/").mkdir(parents=True, exist_ok=True)
+    
+    view = 50
+    for i in range(8290, len(xs)):
+        fig = plt.figure(figsize=(15,5), dpi=300)
+        gs = fig.add_gridspec(1, 3)
+        
+        ax = fig.add_subplot(gs[0, 0])
+        #print(i)
+        #print(ys[i])
+        
+        xstart = max(xs[i]-view, 0)
+        xend = min(xs[i]+view+1, len(data[0]))
+        
+        ystart = max(ys[i]-view, 0)
+        yend = min(ys[i]+view+1, len(data[0]))
+        
+        ax.imshow(data[ystart:yend,xstart:xend])
+        
+        
+        ax = fig.add_subplot(gs[0, 1])
+        ax.plot(range(xstart, xend), data[ys[i], (xstart):(xend)])
+        ax.axvline(x=(xs[i] + radius_list[i]//0.02))
+        ax.axvline(x=(xs[i] - radius_list[i]//0.02))
+        
+        ax = fig.add_subplot(gs[0, 2])
+        ax.plot(range(ystart, yend), data[ystart:yend, xs[i]])
+        ax.axvline(x=(ys[i] + radius_list[i]//0.02))
+        ax.axvline(x=(ys[i] - radius_list[i]//0.02))
+        
+        
+        title = ""
+        
+        if unsharp[i]:
+            title += "Unsharp mask "
+        if wavelet[i]:
+            title += "Wavelet "
+        if fourier[i]:
+            title += "Fourier"
+        
+        title += str(mass_list[i]) + " "
+        
+        if artefact_list[i] == 2:
+            title += "Artefact"
+        
+        if artefact_list[i] == 1:
+            title += "Artefact (unsure)"
+        
+        fig.suptitle(title, fontsize=10)
+        
+        if unsharp[i] and not wavelet[i] and not fourier[i]:
+            if not artefact_list[i]:
+                plt.savefig(path + "unsharp_mask/dense_cores/" + str(i))
+            elif  artefact_list[i] == 2:
+                plt.savefig(path + "unsharp_mask/artefacts/" + str(i))
+            elif  artefact_list[i] == 1:
+                plt.savefig(path + "unsharp_mask/artefacts (unsure)/" + str(i))
+        elif wavelet[i] and not unsharp[i] and not fourier[i]:
+            if not artefact_list[i]:
+                plt.savefig(path + "wavelet/dense_cores/" + str(i))
+            elif artefact_list[i] == 2:
+                plt.savefig(path + "wavelet/artefacts/" + str(i))
+            elif artefact_list[i] == 1:
+                plt.savefig(path + "wavelet/artefacts (unsure)/" + str(i))
+        elif fourier[i] and not unsharp[i] and not wavelet[i]:
+            if not artefact_list[i]:
+                plt.savefig(path + "fourier/dense_cores/" + str(i))
+            elif artefact_list[i] == 2:
+                plt.savefig(path + "fourier/artefacts/" + str(i))
+            elif artefact_list[i] == 1:
+                plt.savefig(path + "fourier/artefacts (unsure)/" + str(i))
+        else:
+            if not artefact_list[i]:
+                plt.savefig(path + "mixed/dense_cores/" + str(i))
+            elif artefact_list[i] == 2:
+                plt.savefig(path + "mixed/artefacts/" + str(i))
+            elif artefact_list[i] == 1:
+                plt.savefig(path + "mixed/artefacts (unsure)/" + str(i))
+        plt.close()
+        
+        if i % 10 == 0:
+            print(i)
+        
+        
+    
+    
 def plot_graphs_and_images(width, height, amount, data, original_data, mask, dense_core_mask, length, highest_val=None, plot_images=True, title=None, lr_min_artefact=None, circ_avg_min_artefact=None, avg_graph=None, mins_list=None, path=None, plot=True):
     
     index_list = np.array(range(np.sum(mask)))
@@ -198,7 +306,7 @@ def plot_graphs_and_images(width, height, amount, data, original_data, mask, den
             plt.close()
 
 
-def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, length, mult, lowest_val, def_plot_arr, lr_artefacts_arr, circ_artefacts_arr, onlyPos=True, onlyArtefacts=False, artefact_df_indexing=True):
+def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, length, mult, lowest_val, def_plot_arr, lr_artefacts_arr, circ_artefacts_arr, sure_artefact_list, onlyPos=True, onlyArtefacts=False, artefact_df_indexing=True):
     
     # Get the lists containing the data to plot
     peak_rows, peak_cols, filtered_by_def, stds, means, lengths = def_plot_arr
@@ -225,7 +333,9 @@ def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, len
             artefact_index += 1
             continue
         
-        
+        if (sure_artefact_list[artefact_index][0] == False):
+            artefact_index += 1
+            continue
         
         # Get the view lengths
         x_view_left = max(peak_cols[i]-x_view - 1, 0)
@@ -251,7 +361,7 @@ def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, len
         
         # Plot the smoothed data for detecting artefacts, and its first right and left min points.
         if not artefact_df_indexing or filtered_by_def[i]:
-            ax.plot(range((x_view_left - peak_cols[i] + 1), (x_view_right - peak_cols[i] + 1)), lr_smoothed_list[artefact_index][(x_view + x_view_left - peak_cols[i] + 1):(x_view + x_view_right - peak_cols[i] + 1)], '-')
+            #ax.plot(range((x_view_left - peak_cols[i] + 1), (x_view_right - peak_cols[i] + 1)), lr_smoothed_list[artefact_index][(x_view + x_view_left - peak_cols[i] + 1):(x_view + x_view_right - peak_cols[i] + 1)], '-')
             left_index = first_left_index_list[artefact_index]
             right_index = first_right_index_list[artefact_index]
             
@@ -289,11 +399,11 @@ def plot_def_and_artefacts(processed_data, original_data, index_arr, x_view, len
         
         if not artefact_df_indexing or filtered_by_def[i]:
             ax.plot(range(0, len(avers[artefact_index])), avers[artefact_index])
-            ax.plot(range(0, len(circ_smoothed_list[artefact_index])), circ_smoothed_list[artefact_index])
+            #ax.plot(range(0, len(circ_smoothed_list[artefact_index])), circ_smoothed_list[artefact_index])
             if circ_smoothed_index_list[artefact_index] != None:
                 ax.plot(circ_smoothed_index_list[artefact_index], circ_smoothed_list[artefact_index][circ_smoothed_index_list[artefact_index]], 'o')
             
-            fig.suptitle(str(i) + ": " + "(" + str(peak_cols[i]) + ", " + str(peak_rows[i]) + ") " + str(filtered_by_def[i]) + ", Artefact: " + str(lr_artefact_list[artefact_index]) + " " + str(circ_artefact_list[artefact_index]), fontsize=20)
+            fig.suptitle(str(i) + ": " + "(" + str(peak_cols[i]) + ", " + str(peak_rows[i]) + ") " + str(filtered_by_def[i]) + ", Artefact: " + str(lr_artefact_list[artefact_index]) + " " + str(circ_artefact_list[artefact_index]) + " " + str(sure_artefact_list[artefact_index]), fontsize=20)
         else:
             fig.suptitle(str(i) + ": " + "(" + str(peak_cols[i]) + ", " + str(peak_rows[i]) + ") " + str(filtered_by_def[i]), fontsize=20)
         

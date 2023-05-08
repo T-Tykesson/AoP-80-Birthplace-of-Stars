@@ -210,7 +210,7 @@ def check_circular_multiple(data, mask, radius_max):
 # If its x is between low and high it is set as an artefact.
 # Returns a mask where at every 1 is a predicted artefact, also returns
 # an array for plotting.
-def circ_avg_min(data, mask, radius_max, low=9, high=15, s=0.005):
+def circ_avg_min(data, mask, radius_max, low=9, high=25, s=0.005):
     avers = check_circular_multiple(data, mask, radius_max)
     artefact_mask = np.zeros(mask.shape, dtype=bool)
     center_ys, center_xs = np.where(mask)
@@ -219,6 +219,7 @@ def circ_avg_min(data, mask, radius_max, low=9, high=15, s=0.005):
     smoothed_list = []
     smoothed_index_list = []
     mins_list = []
+    sure_artefact_list = []
     
     for i in range(len(avers)):
         center_x = center_xs[i]
@@ -234,24 +235,38 @@ def circ_avg_min(data, mask, radius_max, low=9, high=15, s=0.005):
         first_right_index_smooth = mins_smooth[0] if len(mins_smooth) > 0 else None
         
         mins_list.append(len(mins_smooth))
+        maxes, _ = find_peaks(avers[i])
+        first_right_index_max = maxes[0] if len(maxes) > 0 else None
         
         artefact = False
+        
         if first_right_index != None:
             if low <= first_right_index <= high: #and (len(mins) < 7) and (len(mins_smooth) < 4):
                 artefact = True
                 artefact_mask[center_y, center_x] = True
-        
+        """
         if first_right_index_smooth != None:
             if low <= first_right_index_smooth <= high: #and (len(mins) < 7) and (len(mins_smooth) < 4):
                 artefact = True
                 artefact_mask[center_y, center_x] = True
-        
-        smoothed_list.append(ynew)
+        """
+        if artefact:
+            if first_right_index != None and first_right_index_max != None:
+                if round(avers[i][first_right_index]) > round(np.average(avers[i][(first_right_index+15):])) or first_right_index_max < (first_right_index + 1) or first_right_index_max > 30 or avers[i][first_right_index] > (np.mean(avers[i][(first_right_index + 15):]) - abs(5*np.std(avers[i][(first_right_index + 15):]))) or ((avers[i][first_right_index_max] - (np.mean(avers[i][(first_right_index_max+15):]))) < 5*abs(np.std(avers[i][(first_right_index_max+15):]))) or avers[i][first_right_index + 15] - avers[i][first_right_index] < avers[i][0]/9:
+                    sure_artefact_list.append([False, round(avers[i][first_right_index]) > round(np.average(avers[i][(first_right_index+15):])), first_right_index_max < (first_right_index + 1), first_right_index_max > 30 , avers[i][first_right_index] > (np.mean(avers[i][(first_right_index+15):]) - abs(5*np.std(avers[i][(first_right_index+15):]))), (avers[i][first_right_index_max] - (np.mean(avers[i][(first_right_index_max+15):]))), 5*abs(np.std(avers[i][(first_right_index_max+15):]))])
+                else:
+                    sure_artefact_list.append([True, round(avers[i][first_right_index]) > round(np.average(avers[i][(first_right_index+15):])), first_right_index_max < (first_right_index + 1), first_right_index_max > 30 ,  avers[i][first_right_index] > (np.mean(avers[i][(first_right_index+15):]) - abs(5*np.std(avers[i][(first_right_index+15):]))), (avers[i][first_right_index_max] - (np.mean(avers[i][(first_right_index_max+15):]))), 5*abs(np.std(avers[i][(first_right_index_max+15):]))])
+            else:
+                sure_artefact_list.append([False, 0, 0, 0, 0, 0, 0])
+        else:
+            sure_artefact_list.append([False, 0, 0, 0, 0, 0, 0])
+        smoothed_list.append(avers[i])
         artefact_list.append(artefact)
-        smoothed_index_list.append(first_right_index_smooth)
+        smoothed_index_list.append(first_right_index)
+        
         
     
-    return artefact_mask, [center_xs, center_ys, smoothed_list, smoothed_index_list, avers, np.array(artefact_list)], np.array(mins_list)
+    return artefact_mask, [center_xs, center_ys, smoothed_list, smoothed_index_list, avers, np.array(artefact_list)], np.array(mins_list), np.array(sure_artefact_list)
 
 # Checks the first local minima to the left and right of the center point, at every 1 in the given mask.
 # If its x is between low and high it is set as an artefact.
@@ -307,19 +322,24 @@ def lr_min(data, mask, x_view, low = 8, high = 25, s=0.2):
         first_right_index_not_smooth = right_not_smooth[0] if len(right_not_smooth) > 0 else None
         
         artefact = False
+        if first_left_index_not_smooth != None and first_right_index_not_smooth != None:
+            if (-high <= first_left_index_not_smooth - x_view - 1 <= -low and low <= first_right_index_not_smooth - x_view - 1 <= high) :# and (abs(first_right_index - first_left_index) > 5): #and len(mins) < 8 and len(mins_not_smooth) < 8:
+                artefact = True
+                artefact_mask[center_y, center_x] = True
+        """
         if first_left_index != None and first_right_index != None:
-            if (-high <= first_left_index - x_view - 1 <= -low and low <= first_right_index - x_view - 1 <= high) and (abs(first_right_index - first_left_index) > 5): #and len(mins) < 8 and len(mins_not_smooth) < 8:
+            if (-high <= first_left_index - x_view - 1 <= -low and low <= first_right_index - x_view - 1 <= high) :# and (abs(first_right_index - first_left_index) > 5): #and len(mins) < 8 and len(mins_not_smooth) < 8:
                 artefact = True
                 artefact_mask[center_y, center_x] = True
 
-
+        """      
         if len(mins) < 4:
             artefact = True
             artefact_mask[center_y, center_x] = True
-   
-        smoothed_list.append(ynew)
-        first_left_index_list.append(first_left_index)
-        first_right_index_list.append(first_right_index)
+          
+        smoothed_list.append(values)
+        first_left_index_list.append(first_left_index_not_smooth)
+        first_right_index_list.append(first_right_index_not_smooth)
         artefact_list.append(artefact)
         
     return artefact_mask, [center_xs, center_ys, smoothed_list, first_left_index_list, first_right_index_list, np.array(artefact_list)], np.array(mins_list)
