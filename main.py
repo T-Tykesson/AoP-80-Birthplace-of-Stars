@@ -661,8 +661,8 @@ class Classifier:
                 radius = np.array(self.get_radius(slice, dense_x, dense_y), dtype=float)
                 mass_list = np.array(self.get_mass(slice, dense_x, dense_y, radius), dtype=float)*0.0081
                 scatter_plot(radius*0.02, mass_list, xlabel="radie [pc]", ylabel="massa [M$_{\odot}$]", yscale="log", xscale='log', s=1)
-                rad_mass = np.array([radius, mass_list], dtype=float)
-                np.save("radius-mass-distribution_4.npy", rad_mass)
+                #rad_mass = np.array([radius, mass_list], dtype=float)
+                #np.save("radius-mass-distribution_name.npy", rad_mass) #Save mass-radius distribution for art cores
                 
                 full_artefact_mask = dense_cores_mask & artefacts_mask
                 radius_and_artefacts = self.get_radius(slice, dense_and_artefacts_x, dense_and_artefacts_y)
@@ -761,10 +761,10 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path =  "C:/Users/Tage/Programmering/AoP80/Q1-latest-whigal-85.fits"
+    src_path =  ""
     catalog_folder_path = ""
 
-    X_LOWER, X_UPPER = 0_000, 20_000
+    X_LOWER, X_UPPER = 0_000, 40_000
     Y_LOWER, Y_UPPER = 0_000, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER], single_slice=True)
@@ -772,7 +772,7 @@ if __name__ == "__main__":
         "unsharp_mask": True,
         "wavelet": False,
         "fourier": False,
-        "insert_artificial_cores": True, 
+        "insert_artificial_cores": False, 
         "insert_artificial_artefacts": False,
         "save": False, 
         "compare": False, 
