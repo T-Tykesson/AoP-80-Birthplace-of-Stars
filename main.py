@@ -160,25 +160,40 @@ class Classifier:
     def get_mass(self, data, rows, cols, lengths):
         mass_list = []
         for i in range(len(rows)):
-            rows[i] = round(rows[i])
+            radius = round(lengths[i])
+            #print(lengths[i], round(lengths[i]))
             if rows[i] > len(data) - lengths[i] or cols[i] > len(data[0]) - lengths[i] or cols[i] - lengths[i] < 0 or rows[i] - lengths[i] < 0:
                 mass_list.append(0)
                 continue
-            if lengths[i] == 0:
+            
+            if  radius == 0:
                 mass_list.append(0)
             
-            else:
+            elif radius == 1:
+                mass = data[rows[i], cols[i]]
+                mass_list.append(mass)
                 
-                circle_mask = artefacts.create_filled_circular_mask(int(lengths[i])*2, int(lengths[i])*2)
-                data_square = data[(rows[i]-int(lengths[i])):(rows[i]+int(lengths[i])), (cols[i]-int(lengths[i])):(cols[i]+int(lengths[i]))]
+            else:
+                circle_mask = artefacts.create_filled_circular_mask(radius*2-1, radius*2-1)
+                data_square = data[(rows[i]-radius+1):(rows[i]+radius), (cols[i]-radius+1):(cols[i]+radius)]
                 mass = np.sum(data_square * circle_mask)
                 mass_list.append(mass)
+                
+                #if 1 < round(lengths[i]) <= 5:
+                #    plt.imshow(circle_mask)
+                #    plt.title(f"circle mask {lengths[i]}")
+                #    plt.show()
+                    
+                #    plt.imshow(data_square)
+                #    a = len(data_square)
+                #    plt.title(f"{a}")
+                #    plt.show()
                 
         return mass_list
         
     def get_radius(self, data, rows, cols):
         radius_list = []
-        size = 25
+        size = 50
         k = 0
         for i in range(len(rows)):
             if rows[i] > len(data) - (size+1) or cols[i] > len(data[0]) - (size+1) or cols[i] - (size+1) < 0 or rows[i] - (size+1) < 0:
@@ -196,12 +211,14 @@ class Classifier:
             
             # Approxomate a smooth curve of these averages using smooth spline approximation
             #spl = interpolate.splrep(range(len(avers)), avers)
-            x1 = np.linspace(0, 20, num=1280)
+            x1 = np.linspace(0, size, num=size*100)
             #print(avers)
             #print(len(avers))
             x2 = range(len(avers))
+            #print(len(x2))
            
             y2 = np.interp(x1,x2, avers)
+            
             #print("y2:", y2)
             #plt.plot(x1, y2)
             #plt.show()
@@ -226,31 +243,31 @@ class Classifier:
                 radius = 0
                 radius_list.append(0)
             
-            if radius > 20:
+            if  2.5 > radius > 1.5:
                 k += 1
-            #    plt.title(f"Plotting dense core if radius greater than 20, radius: {radius}")
-            #    plt.imshow(data_square)
-            #    plt.show()
+                #plt.title(f"Plotting dense core if radius greater than 20, radius: {radius}")
+                #plt.imshow(data_square)
+                #plt.show()
             #    k += 1
-            #    fig, (ax1, ax2) = plt.subplots(1, 2)
-            #    fig.set_size_inches(18,7)
-            #    fig.set_dpi(300)
+                #fig, (ax1, ax2) = plt.subplots(1, 2)
+                #fig.set_size_inches(18,7)
+                #fig.set_dpi(300)
                 #fig.suptitle('Horizontally stacked subplots')
                 #ax1.set_title(f"Radie: {radius} [pixlar]")
-            #    ax1.set(xlabel='pixlar', ylabel='pixlar')
-            #    ax1.imshow(data_square)
-            #    ax1.imshow(data_square)
-            #    ax1.grid(alpha=0.5)
-            #    radius = round(radius)
-            #    ax2.set_title(f"Beräknat radievärde: {radius} [pixlar]")
-            #    ax2.set(xlabel='radiell förflyttning från centrum [pixlar]', ylabel='Intensitetsmedelvärde [M$_{\odot}$]')
-            #    y2 = y2*0.0081
-            #    ax2.plot(x2, y2)
-            #    half_max = np.ones(len(x2))*(peak + base_line)/2*0.0081
-            #    radius_function = np.ones(len(x2))*radius
-            #    ax2.plot(x2, half_max, "r")
-            #    ax2.plot(radius_function, y2,'--')
-            #    plt.show(fig)
+                #ax1.set(xlabel='pixlar', ylabel='pixlar')
+                #ax1.imshow(data_square)
+                #ax1.imshow(data_square)
+                #ax1.grid(alpha=0.5)
+                #radius = round(radius, 2)
+                #ax2.set_title(f"Beräknat radievärde: {radius} [pixlar]")
+                #ax2.set(xlabel='radiell förflyttning från centrum [pixlar]', ylabel='Intensitetsmedelvärde [M$_{\odot}$]')
+                #y2 = y2*0.0081
+                #ax2.plot(x1, y2)
+                ##half_max = np.ones(len(x1))*(peak + base_line)/2*0.0081
+                #radius_function = np.ones(len(x1))*radius
+                #ax2.plot(x1, half_max, "r")
+                #ax2.plot(radius_function, y2,'--')
+                #plt.show(fig)
                 #plt.clf()
                 #fig = plt.figure()
                 #plt.title(f"Plotting dense core if radius greater than 25, radius: {radius}")
@@ -462,12 +479,12 @@ class Classifier:
         min_dist_between_peaks = 5  # Minimum number of pixels required between each peak
         visual_padding = 51  # Padding around indetified peaks to be shown when plotting
         
-        unsh_mask_absolute_threshold = 2  # Aboslute mimimum of the unsharp mask
+        unsh_mask_absolute_threshold = 1  # Aboslute mimimum of the unsharp mask
         unsh_mask_sigma = 1 # Sigma of unsharp mask
         
-        artificial_cores = 1000  # Number of artificial cores to insert (per slice)
+        artificial_cores = 5000  # Number of artificial cores to insert (per slice)
         kernel_size_for_distr = 1001
-        radius_mass_distribution = np.transpose(np.load("radius-mass-distribution.npy")) #the distribution the arteficial cores will simulate
+        radius_mass_distribution = np.transpose(np.load("radius-mass-distribution_2.npy")) #the distribution the arteficial cores will simulate
         
         #Old method
         artificial_kernel_size = 15
@@ -684,7 +701,7 @@ class Classifier:
                 mass_list = np.array(self.get_mass(slice, dense_x, dense_y, radius), dtype=float)*0.0081
                 scatter_plot(radius*0.02, mass_list, xlabel="radie [pc]", ylabel="massa [M$_{\odot}$]", yscale="log", xscale='log', s=1)
                 #rad_mass = np.array([radius, mass_list], dtype=float)
-                #np.save("radius-mass-distribution.npy", rad_mass)
+                #np.save("radius-mass-distribution_2.npy", rad_mass)
                 
                 full_artefact_mask = dense_cores_mask & artefacts_mask
                 radius_and_artefacts = self.get_radius(slice, dense_and_artefacts_x, dense_and_artefacts_y)
@@ -786,7 +803,7 @@ if __name__ == "__main__":
     src_path =  ""
     catalog_folder_path = ""
 
-    X_LOWER, X_UPPER = 0_000, 40_000
+    X_LOWER, X_UPPER = 0_000, 10_000
     Y_LOWER, Y_UPPER = 0_000, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER], single_slice=True)
