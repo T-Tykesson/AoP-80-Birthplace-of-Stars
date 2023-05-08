@@ -169,13 +169,13 @@ class Classifier:
             if  radius == 0:
                 mass_list.append(0)
             
-            elif radius == 1:
+            elif round(radius) == 0: #if radius is less than 0.5, take only the central pixelvalue as radius
                 mass = data[rows[i], cols[i]]
                 mass_list.append(mass)
                 
             else:
-                circle_mask = artefacts.create_filled_circular_mask(radius*2-1, radius*2-1)
-                data_square = data[(rows[i]-radius+1):(rows[i]+radius), (cols[i]-radius+1):(cols[i]+radius)]
+                circle_mask = artefacts.create_filled_circular_mask(radius*2+1, radius*2+1)
+                data_square = data[(rows[i]-radius):(rows[i]+radius+1), (cols[i]-radius):(cols[i]+radius+1)]
                 mass = np.sum(data_square * circle_mask)
                 mass_list.append(mass)
                 
@@ -193,11 +193,10 @@ class Classifier:
         
     def get_radius(self, data, rows, cols):
         radius_list = []
-        size = 50
+        size = 25
         k = 0
         for i in range(len(rows)):
             if rows[i] > len(data) - (size+1) or cols[i] > len(data[0]) - (size+1) or cols[i] - (size+1) < 0 or rows[i] - (size+1) < 0:
-                #raise ValueError("Invalid input.")
                 radius_list.append(0)
                 continue
             
@@ -212,22 +211,8 @@ class Classifier:
             # Approxomate a smooth curve of these averages using smooth spline approximation
             #spl = interpolate.splrep(range(len(avers)), avers)
             x1 = np.linspace(0, size, num=size*100)
-            #print(avers)
-            #print(len(avers))
             x2 = range(len(avers))
-            #print(len(x2))
-           
             y2 = np.interp(x1,x2, avers)
-            
-            #print("y2:", y2)
-            #plt.plot(x1, y2)
-            #plt.show()
-            # Smooth this curve further by interpolating the values by a factor of 100
-            #x2 = range(len(avers))
-            
-            #y2 = avers #interpolate.splev(x2, spl)
-         
-            
             
             # Traverse through the averages finding the first average to <= half the peak value
             # ( Full width half max )
@@ -243,12 +228,8 @@ class Classifier:
                 radius = 0
                 radius_list.append(0)
             
-            if  2.5 > radius > 1.5:
+            if  radius > 20: #can be used to plot cores of different radius
                 k += 1
-                #plt.title(f"Plotting dense core if radius greater than 20, radius: {radius}")
-                #plt.imshow(data_square)
-                #plt.show()
-            #    k += 1
                 #fig, (ax1, ax2) = plt.subplots(1, 2)
                 #fig.set_size_inches(18,7)
                 #fig.set_dpi(300)
@@ -269,28 +250,8 @@ class Classifier:
                 #ax2.plot(radius_function, y2,'--')
                 #plt.show(fig)
                 #plt.clf()
-                #fig = plt.figure()
-                #plt.title(f"Plotting dense core if radius greater than 25, radius: {radius}")
-                #plt.imshow(data_square)
-                #plt.show()
-                #fig2 = plt.figure()
-                #plt.title(f"Radie {radius}")
-                #plt.plot(x2, y2)
-                #half_max = np.ones(len(x2))*peak/2
-                #radius_function = np.ones(len(x2))*radius
-                #plt.plot(x2, half_max, "r")
-                #plt.plot(radius_function, y2,'--')
-                #plt.grid(False)
-                #plt.show()
-                #plt.title(f"US: Plotting dense core if radius greater than 20, radius: {radius}")
-                #plt.imshow(us_data_square)
-                #plt.show()
-                
-       
-                #plt.show()
         print("Found cores over 20:", k)
         print("Cores not found:", len(radius_list) - np. count_nonzero(radius_list))
-        #print(radius_list)
 
         return radius_list
             
@@ -479,12 +440,12 @@ class Classifier:
         min_dist_between_peaks = 5  # Minimum number of pixels required between each peak
         visual_padding = 51  # Padding around indetified peaks to be shown when plotting
         
-        unsh_mask_absolute_threshold = 1  # Aboslute mimimum of the unsharp mask
+        unsh_mask_absolute_threshold = 0.5  # Aboslute mimimum of the unsharp mask
         unsh_mask_sigma = 1 # Sigma of unsharp mask
         
         artificial_cores = 5000  # Number of artificial cores to insert (per slice)
         kernel_size_for_distr = 1001
-        radius_mass_distribution = np.transpose(np.load("radius-mass-distribution_2.npy")) #the distribution the arteficial cores will simulate
+        radius_mass_distribution = np.transpose(np.load("radius-mass-distribution_4.npy")) #the distribution the arteficial cores will simulate
         
         #Old method
         artificial_kernel_size = 15
@@ -700,8 +661,8 @@ class Classifier:
                 radius = np.array(self.get_radius(slice, dense_x, dense_y), dtype=float)
                 mass_list = np.array(self.get_mass(slice, dense_x, dense_y, radius), dtype=float)*0.0081
                 scatter_plot(radius*0.02, mass_list, xlabel="radie [pc]", ylabel="massa [M$_{\odot}$]", yscale="log", xscale='log', s=1)
-                #rad_mass = np.array([radius, mass_list], dtype=float)
-                #np.save("radius-mass-distribution_2.npy", rad_mass)
+                rad_mass = np.array([radius, mass_list], dtype=float)
+                np.save("radius-mass-distribution_4.npy", rad_mass)
                 
                 full_artefact_mask = dense_cores_mask & artefacts_mask
                 radius_and_artefacts = self.get_radius(slice, dense_and_artefacts_x, dense_and_artefacts_y)
@@ -800,10 +761,10 @@ class Classifier:
 if __name__ == "__main__":
     plt.style.use(astropy_mpl_style)
     
-    src_path =  ""
+    src_path =  "C:/Users/Tage/Programmering/AoP80/Q1-latest-whigal-85.fits"
     catalog_folder_path = ""
 
-    X_LOWER, X_UPPER = 0_000, 10_000
+    X_LOWER, X_UPPER = 0_000, 20_000
     Y_LOWER, Y_UPPER = 0_000, 7_000
 
     sc = Classifier(src_path, [Y_LOWER, Y_UPPER, X_LOWER, X_UPPER], single_slice=True)
@@ -811,7 +772,7 @@ if __name__ == "__main__":
         "unsharp_mask": True,
         "wavelet": False,
         "fourier": False,
-        "insert_artificial_cores": False, 
+        "insert_artificial_cores": True, 
         "insert_artificial_artefacts": False,
         "save": False, 
         "compare": False, 

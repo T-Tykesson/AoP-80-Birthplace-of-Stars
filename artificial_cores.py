@@ -251,18 +251,13 @@ def insert_art_artefacts(data, amount, intensity="Random", int_min=50, int_max=3
     h, w = sinc2d.shape[:2]
     circular_mask = create_circular_mask(h, w)
     
-    plt.figure(figsize=(6,6), dpi=300)
-    plt.imshow(sinc2d)
-    
-    plt.grid(alpha=0.6)
-    plt.xlabel("pixlar")
-    plt.ylabel("pixlar")
-    plt.show()
     art_artefact = sinc2d.copy()
     art_artefact[~circular_mask] = 0
+    
     art_data, art_catalog = insert_circles(data, art_artefact, amount, intensity=intensity, int_min=int_min, int_max=int_max)
     art_catalog = np.array(art_catalog)
     
     art_catalog_tuples = list(map(tuple, art_catalog[:,0:2]))
     
     return art_data, art_catalog, art_catalog_tuples
+
